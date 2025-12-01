@@ -1,0 +1,373 @@
+from typing import List, Dict, Tuple, Optional
+from dataclasses import dataclass
+import numpy as np
+from datetime import datetime, timedelta
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class POINode:
+    """Represents a Point of Interest for optimization"""
+    id: int
+    name: str
+    latitude: float
+    longitude: float
+    popularity: int  # 1-100
+    opening_time: int  # minutes from midnight
+    closing_time: int  # minutes from midnight
+    visit_duration: int  # minutes
+    category: str
+    price: float
+    rating: float
+    tags: List[str]
+    district: str
+    learned_weight: float = 1.0
+
+
+@dataclass
+class TOPTWConstraints:
+    """Constraints for the TOPTW problem"""
+    max_duration: int  # Total time available (minutes)
+    max_budget: float  # Maximum budget
+    start_time: int  # Start time in minutes from midnight
+    user_pace: str  # "slow", "medium", "fast"
+    mandatory_categories: List[str]  # Must visit at least one
+    avoid_categories: List[str]  # Avoid these
+    preferred_districts: List[str]  # Prefer these districts
+    weather_conditions: Dict[str, any]  # Current weather data
+
+
+class TOPTWSolver:
+    """
+    Team Orienteering Problem with Time Windows Solver
+    
+    Objective: Maximize total score while respecting:
+    - Time windows (opening/closing hours)
+    - Total duration constraint
+    - Budget constraint
+    - Weather conditions
+    - User preferences
+    """
+    
+    def __init__(self, pois: List[POINode], constraints: TOPTWConstraints):
+        self.pois = pois
+        self.constraints = constraints
+        self.distance_matrix = None  # Will be set externally
+        self.time_matrix = None  # Travel time matrix (minutes)
+        
+        # Weights for fitness function
+        self.alpha = 0.1  # Travel time penalty weight
+        self.beta = 0.5   # Cost penalty weight
+        self.gamma = 2.0  # Constraint violation penalty weight
+        
+    def set_distance_matrix(self, time_matrix: np.ndarray):
+        """Set the travel time matrix between POIs (in minutes)"""
+        self.time_matrix = time_matrix
+        
+    def calculate_fitness(self, route: List[int]) -> float:
+        """
+        Calculate fitness score for a route
+        
+        Fitness = Σ(Popularity × WeatherWeight × UserWeight × LearnedWeight) 
+                  - (α × TravelTime) - (β × Cost) - Penalties
+        """
+        if not route or len(route) == 0:
+            return 0.0
+            
+        total_score = 0.0
+        total_time = 0
+        total_cost = 0.0
+        current_time = self.constraints.start_time
+        penalties = 0.0
+        
+        # Track visited categories for mandatory requirements
+        visited_categories = set()
+        
+        for i, poi_idx in enumerate(route):
+            if poi_idx >= len(self.pois):
+                penalties += 1000  # Invalid POI index
+                continue
+                
+            poi = self.pois[poi_idx]
+            visited_categories.add(poi.category)
+            
+            # Travel time to this POI
+            if i > 0:
+                prev_idx = route[i-1]
+                if self.time_matrix is not None and prev_idx < len(self.time_matrix):
+                    travel_time = self.time_matrix[prev_idx][poi_idx]
+                else:
+                    # Fallback: estimate based on distance
+                    travel_time = self._estimate_travel_time(
+                        self.pois[prev_idx], poi
+                    )
+                
+                total_time += travel_time
+                current_time += travel_time
+            
+            # Check if POI is in avoided categories
+            if poi.category in self.constraints.avoid_categories:
+                penalties += 50
+                continue
+            
+            # Time window constraints
+            if current_time < poi.opening_time:
+                # Arrived too early - must wait
+                wait_time = poi.opening_time - current_time
+                penalties += wait_time * 0.5  # Waiting penalty
+                current_time = poi.opening_time
+                total_time += wait_time
+            
+            if current_time >= poi.closing_time:
+                # Arrived too late - cannot visit
+                penalties += 200  # Heavy penalty for missing POI
+                continue
+            
+            if current_time + poi.visit_duration > poi.closing_time:
+                # Not enough time to visit before closing
+                penalties += 150
+                continue
+            
+            # Visit the POI
+            total_time += poi.visit_duration
+            current_time += poi.visit_duration
+            total_cost += poi.price
+            
+            # Calculate weighted score
+            weather_weight = self._calculate_weather_weight(poi)
+            user_weight = self._calculate_user_preference_weight(poi)
+            
+            poi_score = (
+                poi.popularity * 
+                weather_weight * 
+                user_weight * 
+                poi.learned_weight *
+                (poi.rating / 5.0)  # Normalize rating to 0-1
+            )
+            
+            total_score += poi_score
+        
+        # Check mandatory categories
+        for category in self.constraints.mandatory_categories:
+            if category not in visited_categories:
+                penalties += 100  # Penalty for missing mandatory category
+        
+        # Duration constraint
+        if total_time > self.constraints.max_duration:
+            overtime = total_time - self.constraints.max_duration
+            penalties += overtime * self.gamma
+        
+        # Budget constraint
+        if total_cost > self.constraints.max_budget:
+            over_budget = total_cost - self.constraints.max_budget
+            penalties += over_budget * self.beta * 10
+        
+        # Pace adjustment
+        pace_multiplier = self._get_pace_multiplier()
+        adjusted_time = total_time * pace_multiplier
+        
+        if adjusted_time > self.constraints.max_duration:
+            penalties += (adjusted_time - self.constraints.max_duration) * self.gamma
+        
+        # Final fitness calculation
+        fitness = total_score - (self.alpha * total_time) - (self.beta * total_cost) - penalties
+        
+        return max(0.0, fitness)
+    
+    def _calculate_weather_weight(self, poi: POINode) -> float:
+        """Calculate weight adjustment based on weather conditions"""
+        weight = 1.0
+        weather = self.constraints.weather_conditions
+        
+        if not weather:
+            return weight
+        
+        # Rain penalty for outdoor activities
+        if weather.get("precipitation", 0) > 2:  # mm/hour
+            if any(tag in poi.tags for tag in ["outdoor", "park", "beach"]):
+                weight *= 0.5  # Reduce score for outdoor POIs in rain
+            elif any(tag in poi.tags for tag in ["museum", "indoor", "cultural"]):
+                weight *= 1.3  # Boost indoor POIs in rain
+        
+        # Temperature considerations
+        temp = weather.get("temperature", 20)
+        if temp > 30:  # Hot weather
+            if "outdoor" in poi.tags:
+                weight *= 0.7
+            elif "indoor" in poi.tags:
+                weight *= 1.2
+        elif temp < 15:  # Cool weather
+            if "beach" in poi.tags:
+                weight *= 0.6
+        
+        # Wind considerations
+        if weather.get("wind_speed", 0) > 30:  # km/h
+            if "beach" in poi.tags or "outdoor" in poi.tags:
+                weight *= 0.8
+        
+        return weight
+    
+    def _calculate_user_preference_weight(self, poi: POINode) -> float:
+        """Calculate weight based on user preferences"""
+        weight = 1.0
+        
+        # Category preferences
+        if poi.category in self.constraints.mandatory_categories:
+            weight *= 1.5
+        
+        if poi.category in self.constraints.avoid_categories:
+            weight *= 0.2
+        
+        # District preferences
+        if self.constraints.preferred_districts:
+            if poi.district in self.constraints.preferred_districts:
+                weight *= 1.3
+            else:
+                weight *= 0.8
+        
+        return weight
+    
+    def _get_pace_multiplier(self) -> float:
+        """Get time multiplier based on user pace"""
+        pace_multipliers = {
+            "slow": 1.3,
+            "medium": 1.0,
+            "fast": 0.8
+        }
+        return pace_multipliers.get(self.constraints.user_pace, 1.0)
+    
+    def _estimate_travel_time(self, poi1: POINode, poi2: POINode) -> float:
+        """Estimate travel time between two POIs using haversine distance"""
+        # Haversine formula for distance
+        lat1, lon1 = np.radians(poi1.latitude), np.radians(poi1.longitude)
+        lat2, lon2 = np.radians(poi2.latitude), np.radians(poi2.longitude)
+        
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        
+        a = np.sin(dlat/2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2)**2
+        c = 2 * np.arcsin(np.sqrt(a))
+        
+        # Earth radius in km
+        distance_km = 6371 * c
+        
+        # Assume walking speed of 4 km/h
+        time_hours = distance_km / 4.0
+        time_minutes = time_hours * 60
+        
+        return time_minutes
+    
+    def validate_route(self, route: List[int]) -> Tuple[bool, List[str]]:
+        """Validate if a route is feasible"""
+        errors = []
+        
+        if not route:
+            errors.append("Route is empty")
+            return False, errors
+        
+        current_time = self.constraints.start_time
+        total_time = 0
+        total_cost = 0.0
+        
+        for i, poi_idx in enumerate(route):
+            if poi_idx >= len(self.pois):
+                errors.append(f"Invalid POI index: {poi_idx}")
+                continue
+            
+            poi = self.pois[poi_idx]
+            
+            # Add travel time
+            if i > 0:
+                prev_idx = route[i-1]
+                if self.time_matrix is not None:
+                    travel_time = self.time_matrix[prev_idx][poi_idx]
+                else:
+                    travel_time = self._estimate_travel_time(self.pois[prev_idx], poi)
+                
+                current_time += travel_time
+                total_time += travel_time
+            
+            # Check time window
+            if current_time >= poi.closing_time:
+                errors.append(f"POI {poi.name} closes before arrival")
+            
+            # Visit
+            current_time += poi.visit_duration
+            total_time += poi.visit_duration
+            total_cost += poi.price
+        
+        # Check constraints
+        if total_time > self.constraints.max_duration:
+            errors.append(f"Total time ({total_time} min) exceeds limit ({self.constraints.max_duration} min)")
+        
+        if total_cost > self.constraints.max_budget:
+            errors.append(f"Total cost (${total_cost}) exceeds budget (${self.constraints.max_budget})")
+        
+        return len(errors) == 0, errors
+    
+    def get_route_details(self, route: List[int]) -> Dict:
+        """Get detailed information about a route"""
+        if not route:
+            return {}
+        
+        timeline = []
+        current_time = self.constraints.start_time
+        total_cost = 0.0
+        total_distance = 0.0
+        
+        for i, poi_idx in enumerate(route):
+            poi = self.pois[poi_idx]
+            
+            # Travel time
+            travel_time = 0
+            if i > 0:
+                prev_idx = route[i-1]
+                if self.time_matrix is not None:
+                    travel_time = self.time_matrix[prev_idx][poi_idx]
+                else:
+                    travel_time = self._estimate_travel_time(self.pois[prev_idx], poi)
+                
+                current_time += travel_time
+            
+            # Adjust for opening time
+            arrival_time = current_time
+            if current_time < poi.opening_time:
+                current_time = poi.opening_time
+            
+            # Visit
+            departure_time = current_time + poi.visit_duration
+            
+            timeline.append({
+                "poi_id": poi.id,
+                "poi_name": poi.name,
+                "category": poi.category,
+                "district": poi.district,
+                "arrival_time": self._minutes_to_time_string(arrival_time),
+                "departure_time": self._minutes_to_time_string(departure_time),
+                "visit_duration": poi.visit_duration,
+                "travel_time": int(travel_time),
+                "wait_time": max(0, poi.opening_time - arrival_time),
+                "price": poi.price,
+                "latitude": poi.latitude,
+                "longitude": poi.longitude
+            })
+            
+            current_time = departure_time
+            total_cost += poi.price
+        
+        return {
+            "timeline": timeline,
+            "total_duration": current_time - self.constraints.start_time,
+            "total_cost": total_cost,
+            "num_pois": len(route),
+            "start_time": self._minutes_to_time_string(self.constraints.start_time),
+            "end_time": self._minutes_to_time_string(current_time)
+        }
+    
+    def _minutes_to_time_string(self, minutes: int) -> str:
+        """Convert minutes from midnight to HH:MM format"""
+        hours = int(minutes // 60)
+        mins = int(minutes % 60)
+        return f"{hours:02d}:{mins:02d}"
