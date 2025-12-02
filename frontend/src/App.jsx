@@ -50,60 +50,14 @@ function App() {
                 setRecommendations(data.pois)
                 setStep('recommendations')
             } catch (fetchErr) {
-                // Fallback to client-side mock data if fetch fails or times out
-                console.warn("Backend unavailable or slow, using client-side demo data")
-                const demoData = [
-                    {
-                        "id": 101,
-                        "name": "Parque Kennedy",
-                        "category": "Park",
-                        "district": "Miraflores",
-                        "latitude": -12.1218,
-                        "longitude": -77.0297,
-                        "rating": 4.8,
-                        "visit_duration": 60,
-                        "popularity": 95
-                    },
-                    {
-                        "id": 102,
-                        "name": "Larcomar",
-                        "category": "Shopping",
-                        "district": "Miraflores",
-                        "latitude": -12.1320,
-                        "longitude": -77.0305, // Adjusted to be more inland
-                        "rating": 4.7,
-                        "visit_duration": 120,
-                        "popularity": 90
-                    },
-                    {
-                        "id": 103,
-                        "name": "Huaca Pucllana",
-                        "category": "Museum",
-                        "district": "Miraflores",
-                        "latitude": -12.1111,
-                        "longitude": -77.0342,
-                        "rating": 4.6,
-                        "visit_duration": 90,
-                        "popularity": 85
-                    },
-                    {
-                        "id": 104,
-                        "name": "Parque del Amor",
-                        "category": "Park",
-                        "district": "Miraflores",
-                        "latitude": -12.1260,
-                        "longitude": -77.0370, // Adjusted to be more inland
-                        "rating": 4.5,
-                        "visit_duration": 45,
-                        "popularity": 88
-                    }
-                ]
-                setRecommendations(demoData)
-                setStep('recommendations')
+                console.error("Backend error:", fetchErr)
+                throw fetchErr
             }
         } catch (err) {
             console.error('Error getting recommendations:', err)
-            setError(err.message)
+            setError(err.message || "Error connecting to server")
+            // Clear recommendations on error to avoid showing stale or wrong data
+            setRecommendations([])
         } finally {
             setLoading(false)
         }
@@ -122,18 +76,29 @@ function App() {
         try {
             // Prepare payload with selected POIs if available
             const payload = { ...currentPreferences }
+
+            // Sanitize start_location: Backend expects Dict[str, float], so remove 'address' string
+            if (payload.start_location) {
+                const { latitude, longitude } = payload.start_location
+                if (latitude && longitude) {
+                    payload.start_location = { latitude, longitude }
+                } else {
+                    payload.start_location = null
+                }
+            }
+
             if (recommendations && recommendations.length > 0) {
                 payload.selected_poi_ids = recommendations.map(poi => poi.id)
             }
 
-            // Step 2: Generate full route with geometry
-            const response = await fetch('http://localhost:8000/api/optimize/quick-route', {
+            // Use advanced optimization endpoint
+            const response = await fetch('http://localhost:8000/api/optimize/generate-route', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(payload)
-            })
+                body: JSON.stringify(payload),
+            });
 
             if (!response.ok) {
                 const errorData = await response.json()

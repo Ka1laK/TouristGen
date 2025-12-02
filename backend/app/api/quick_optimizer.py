@@ -249,24 +249,72 @@ def recommend_pois(
         # Get POI service
         poi_service = POIService(db)
         
-        # Get POIs
-        if request.preferred_districts:
+        pois = []
+        
+        # Logic 1: If start location is provided, find nearby POIs
+        # Handle both lat/lng and latitude/longitude keys
+        start_lat = None
+        start_lon = None
+        
+        if request.start_location:
+            if "lat" in request.start_location and "lng" in request.start_location:
+                start_lat = request.start_location["lat"]
+                start_lon = request.start_location["lng"]
+            elif "latitude" in request.start_location and "longitude" in request.start_location:
+                start_lat = request.start_location["latitude"]
+                start_lon = request.start_location["longitude"]
+        
+        if start_lat is not None and start_lon is not None:
+            logger.info(f"Using start location for recommendations: {start_lat}, {start_lon}")
+            all_pois = poi_service.get_all_pois()
+            
+            # Calculate distance to each POI
+            pois_with_dist = []
+            for poi in all_pois:
+                # Simple Euclidean approximation for sorting is enough here, or Haversine
+                dist = ((poi.latitude - start_lat)**2 + (poi.longitude - start_lon)**2)**0.5
+                pois_with_dist.append((poi, dist))
+            
+            # Sort by distance
+            pois_with_dist.sort(key=lambda x: x[1])
+            pois = [p[0] for p in pois_with_dist]
+            
+            # Apply other filters if present (categories)
+            if request.mandatory_categories:
+                pois = [p for p in pois if p.category in request.mandatory_categories]
+                
+            # Take top 10 closest
+            pois = pois[:10]
+            
+        # Logic 2: If no start location, filter by district
+        elif request.preferred_districts:
+            logger.info(f"Filtering by districts: {request.preferred_districts}")
             pois = poi_service.filter_pois(districts=request.preferred_districts, min_rating=3.0)
+            logger.info(f"Found {len(pois)} POIs in districts {request.preferred_districts}")
+        
+        # Logic 3: Fallback to all POIs (sorted by popularity)
         else:
+            logger.info("No start location or districts, fetching all POIs")
             pois = poi_service.get_all_pois()
             
         if not pois:
+            logger.warning(f"No POIs found. Districts: {request.preferred_districts}, StartLoc: {request.start_location}")
+            # If specific district was requested but no POIs found, don't return Miraflores fallback!
+            if request.preferred_districts:
+                 return {"pois": [], "count": 0, "message": "No places found in this district"}
+            
             raise HTTPException(status_code=404, detail="No POIs found")
             
-        # Filter by categories
-        if request.mandatory_categories:
-            pois = [poi for poi in pois if poi.category in request.mandatory_categories]
-        
-        if request.avoid_categories:
-            pois = [poi for poi in pois if poi.category not in request.avoid_categories]
+        # Filter by categories (if not already done in Logic 1)
+        if start_lat is None:
+            if request.mandatory_categories:
+                pois = [poi for poi in pois if poi.category in request.mandatory_categories]
             
-        # Sort by popularity and take top 10
-        pois = sorted(pois, key=lambda x: x.popularity, reverse=True)[:10]
+            if request.avoid_categories:
+                pois = [poi for poi in pois if poi.category not in request.avoid_categories]
+                
+            # Sort by popularity and take top 10
+            pois = sorted(pois, key=lambda x: x.popularity, reverse=True)[:10]
         
         return {
             "pois": [poi.to_dict() for poi in pois],
@@ -274,54 +322,10 @@ def recommend_pois(
         }
         
     except Exception as e:
-        logger.error(f"Error getting recommendations: {e}. Using fallback data.")
-        # Fallback data for immediate response
+        logger.error(f"Error getting recommendations: {e}")
+        # Only return fallback if it was a generic error, NOT if we just found 0 results
         return {
-            "pois": [
-                {
-                    "id": 101,
-                    "name": "Parque Kennedy",
-                    "category": "Park",
-                    "district": "Miraflores",
-                    "latitude": -12.1218,
-                    "longitude": -77.0297,
-                    "rating": 4.8,
-                    "visit_duration": 60,
-                    "popularity": 95
-                },
-                {
-                    "id": 102,
-                    "name": "Larcomar",
-                    "category": "Shopping",
-                    "district": "Miraflores",
-                    "latitude": -12.1325,
-                    "longitude": -77.0350,
-                    "rating": 4.7,
-                    "visit_duration": 120,
-                    "popularity": 90
-                },
-                {
-                    "id": 103,
-                    "name": "Huaca Pucllana",
-                    "category": "Museum",
-                    "district": "Miraflores",
-                    "latitude": -12.1111,
-                    "longitude": -77.0342,
-                    "rating": 4.6,
-                    "visit_duration": 90,
-                    "popularity": 85
-                },
-                {
-                    "id": 104,
-                    "name": "Parque del Amor",
-                    "category": "Park",
-                    "district": "Miraflores",
-                    "latitude": -12.1280,
-                    "longitude": -77.0390,
-                    "rating": 4.5,
-                    "visit_duration": 45,
-                    "popularity": 88
-                }
-            ],
-            "count": 4
+            "pois": [],
+            "count": 0,
+            "error": str(e)
         }

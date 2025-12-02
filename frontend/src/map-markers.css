@@ -53,3 +53,10 @@
 .route-popup strong {
     color: var(--primary-color);
 }
+.start-pin::before {
+    background: #10b981; /* Green color for start location */
+}
+
+.recommendation-pin::before {
+    background: var(--primary-color);
+}

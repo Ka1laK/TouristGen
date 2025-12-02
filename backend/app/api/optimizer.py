@@ -29,6 +29,7 @@ class OptimizationRequest(BaseModel):
     avoid_categories: List[str] = Field(default=[], description="Categories to avoid")
     preferred_districts: List[str] = Field(default=[], description="Preferred districts")
     start_location: Optional[Dict[str, float]] = Field(None, description="Starting location {lat, lon}")
+    selected_poi_ids: Optional[List[int]] = Field(None, description="Pre-selected POI IDs to optimize")
 
 
 class TimelineItem(BaseModel):
@@ -95,18 +96,25 @@ async def generate_route(
         routes_service = RoutesService(api_key=settings.openrouteservice_api_key)
         
         # Get POIs based on preferences
-        pois = poi_service.filter_pois(
-            districts=request.preferred_districts if request.preferred_districts else None,
-            categories=None,  # Don't filter categories here, let GA handle it
-            min_rating=3.0  # Only consider reasonably rated POIs
-        )
-        
-        if not pois:
-            raise HTTPException(status_code=404, detail="No POIs found matching criteria")
-        
-        # OPTIMIZATION: Limit to top 15 most popular POIs to speed up calculation
-        # Sort by popularity and take top 15
-        pois = sorted(pois, key=lambda x: x.popularity, reverse=True)[:15]
+        # If user has pre-selected specific POIs (from recommendations), use only those
+        if request.selected_poi_ids:
+            logger.info(f"Using pre-selected POI IDs: {request.selected_poi_ids}")
+            pois = [poi_service.get_poi_by_id(poi_id) for poi_id in request.selected_poi_ids]
+            pois = [poi for poi in pois if poi is not None]  # Filter out None values
+        else:
+            # Otherwise, filter by districts and get top POIs
+            pois = poi_service.filter_pois(
+                districts=request.preferred_districts if request.preferred_districts else None,
+                categories=None,  # Don't filter categories here, let GA handle it
+                min_rating=3.0  # Only consider reasonably rated POIs
+            )
+            
+            if not pois:
+                raise HTTPException(status_code=404, detail="No POIs found matching criteria")
+            
+            # OPTIMIZATION: Limit to top 15 most popular POIs to speed up calculation
+            # Sort by popularity and take top 15
+            pois = sorted(pois, key=lambda x: x.popularity, reverse=True)[:15]
         
         logger.info(f"Found {len(pois)} POIs for optimization")
         
@@ -172,20 +180,36 @@ async def generate_route(
         
         logger.info(f"Calculated distance matrix: {time_matrix.shape}")
         
-        # Initialize and run Genetic Algorithm
-        ga = GeneticAlgorithm(
+        # Initialize and run Ant Colony Optimization (ACO)
+        from app.services.aco_optimizer import AntColonyOptimizer
+        
+        aco = AntColonyOptimizer(
             pois=poi_nodes,
             constraints=constraints,
-            population_size=settings.ga_population_size,
-            generations=settings.ga_generations,
-            mutation_rate=settings.ga_mutation_rate,
-            crossover_rate=settings.ga_crossover_rate
+            num_ants=30,
+            iterations=50, # Fast convergence
+            alpha=1.0,
+            beta=3.0 # Prioritize heuristics (distance/popularity)
         )
         
-        ga.set_distance_matrix(time_matrix)
+        aco.set_distance_matrix(time_matrix)
         
-        logger.info("Starting genetic algorithm optimization...")
-        best_route, best_fitness = ga.evolve(verbose=True)
+        logger.info("Starting Ant Colony Optimization...")
+        best_route, best_fitness = aco.solve(verbose=True)
+        
+        # Store solver reference for later use
+        solver = aco.solver
+        
+        # Fallback to GA if ACO fails (just in case)
+        if not best_route:
+            logger.warning("ACO failed to find route, falling back to GA")
+            ga = GeneticAlgorithm(
+                pois=poi_nodes,
+                constraints=constraints
+            )
+            ga.set_distance_matrix(time_matrix)
+            best_route, best_fitness = ga.evolve()
+            solver = ga.solver
         
         if not best_route:
             raise HTTPException(status_code=500, detail="Failed to generate route")
@@ -193,7 +217,7 @@ async def generate_route(
         logger.info(f"Optimization complete. Best fitness: {best_fitness:.2f}")
         
         # Get route details
-        route_details = ga.solver.get_route_details(best_route)
+        route_details = solver.get_route_details(best_route)
         
         # Generate route ID
         route_id = f"route_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -240,7 +264,7 @@ async def generate_route(
             route_id=route_id,
             route=[poi.to_dict() for poi in route_poi_objects if poi],
             timeline=timeline_items,
-            total_duration=route_details["total_duration"],
+            total_duration=int(round(route_details["total_duration"])),
             total_cost=route_details["total_cost"],
             fitness_score=best_fitness,
             start_time=route_details["start_time"],
