@@ -1,7 +1,10 @@
 import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import 'leaflet-routing-machine'
+import 'leaflet-routing-machine/dist/leaflet-routing-machine.css'
 import '../map-markers.css'
+import '../routing.css'
 
 // Fix for default marker icons in React
 import icon from 'leaflet/dist/images/marker-icon.png'
@@ -50,10 +53,16 @@ function Map({ route, recommendations, step, startLocation }) {
         markersRef.current = []
         polylinesRef.current = []
 
+        // Remove routing control if exists
+        if (mapInstanceRef.current.routingControl) {
+            mapInstanceRef.current.removeControl(mapInstanceRef.current.routingControl)
+            mapInstanceRef.current.routingControl = null
+        }
+
         const bounds = []
 
         // 1. Draw Start Location
-        if (startLocation && startLocation.latitude && startLocation.longitude) {
+        if (step !== 'routing' && startLocation && startLocation.latitude && startLocation.longitude) {
             const startMarker = L.marker([startLocation.latitude, startLocation.longitude], {
                 icon: L.divIcon({
                     className: 'custom-marker start-marker',
@@ -102,65 +111,73 @@ function Map({ route, recommendations, step, startLocation }) {
 
         // 3. Draw Full Route (Step 2)
         if (step === 'routing' && route && route.route) {
-            // Add numbered markers for each POI
-            route.route.forEach((poi, index) => {
-                const marker = L.marker([poi.latitude, poi.longitude], {
-                    icon: L.divIcon({
-                        className: 'custom-marker',
-                        html: `<div class="marker-pin">
-                    <div class="marker-number">${index + 1}</div>
-                   </div>`,
-                        iconSize: [30, 42],
-                        iconAnchor: [15, 42]
-                    })
-                })
+            // Create waypoints including start location
+            const waypoints = []
+            let hasStart = false
 
-                marker.bindPopup(`
-          <div class="marker-popup">
-            <h3>${poi.name}</h3>
-            <p><strong>Categoría:</strong> ${poi.category}</p>
-            <p><strong>Distrito:</strong> ${poi.district}</p>
-            <p><strong>Rating:</strong> ${'⭐'.repeat(Math.round(poi.rating || 4))}</p>
-            <p><strong>Duración:</strong> ${poi.visit_duration} min</p>
-          </div>
-        `)
+            if (startLocation && startLocation.latitude && startLocation.longitude) {
+                waypoints.push(L.latLng(startLocation.latitude, startLocation.longitude))
+                hasStart = true
+            }
 
-                marker.addTo(mapInstanceRef.current)
-                markersRef.current.push(marker)
-                bounds.push([poi.latitude, poi.longitude])
+            route.route.forEach(poi => {
+                waypoints.push(L.latLng(poi.latitude, poi.longitude))
             })
 
-            // Draw route lines with geometry if available
-            if (route.route_geometry && route.route_geometry.length > 0) {
-                route.route_geometry.forEach((segment, index) => {
-                    if (segment && segment.coordinates && segment.coordinates.length > 0) {
-                        const latlngs = segment.coordinates.map(coord => [coord[1], coord[0]])
-
-                        const polyline = L.polyline(latlngs, {
-                            color: '#10b981', // Green color
-                            weight: 5,
-                            opacity: 0.7,
-                            smoothFactor: 1
-                        })
-
-                        polyline.addTo(mapInstanceRef.current)
-                        polylinesRef.current.push(polyline)
-                        latlngs.forEach(latlng => bounds.push(latlng))
+            // Add Routing Control
+            const routingControl = L.Routing.control({
+                waypoints: waypoints,
+                routeWhileDragging: false,
+                fitSelectedRoutes: true,
+                language: 'es', // Set language to Spanish
+                containerClassName: 'routing-instructions', // Custom class for styling
+                lineOptions: {
+                    styles: [{ color: '#6366f1', opacity: 0.8, weight: 6 }]
+                },
+                createMarker: function (i, waypoint, n) {
+                    // Handle Start Location Marker
+                    if (hasStart && i === 0) {
+                        return L.marker(waypoint.latLng, {
+                            icon: L.divIcon({
+                                className: 'custom-marker start-marker',
+                                html: `<div class="marker-pin start-pin">
+                                <div class="marker-icon">🏠</div>
+                               </div>`,
+                                iconSize: [30, 42],
+                                iconAnchor: [15, 42]
+                            })
+                        }).bindPopup(`<strong>Inicio:</strong> ${startLocation.address || 'Ubicación actual'}`)
                     }
-                })
-            } else {
-                // Fallback lines
-                for (let i = 0; i < route.route.length - 1; i++) {
-                    const start = route.route[i]
-                    const end = route.route[i + 1]
-                    const polyline = L.polyline(
-                        [[start.latitude, start.longitude], [end.latitude, end.longitude]],
-                        { color: '#3b82f6', weight: 3, opacity: 0.5, dashArray: '10, 10' }
-                    )
-                    polyline.addTo(mapInstanceRef.current)
-                    polylinesRef.current.push(polyline)
+
+                    // Handle POI Markers
+                    const poiIndex = hasStart ? i - 1 : i
+                    const poi = route.route[poiIndex]
+
+                    if (!poi) return null
+
+                    return L.marker(waypoint.latLng, {
+                        icon: L.divIcon({
+                            className: 'custom-marker',
+                            html: `<div class="marker-pin">
+                                <div class="marker-number">${poiIndex + 1}</div>
+                               </div>`,
+                            iconSize: [30, 42],
+                            iconAnchor: [15, 42]
+                        })
+                    }).bindPopup(`
+                        <div class="marker-popup">
+                            <h3>${poi.name}</h3>
+                            <p><strong>Categoría:</strong> ${poi.category}</p>
+                            <p><strong>Distrito:</strong> ${poi.district}</p>
+                            <p><strong>Rating:</strong> ${'⭐'.repeat(Math.round(poi.rating || 4))}</p>
+                            <p><strong>Duración:</strong> ${poi.visit_duration} min</p>
+                        </div>
+                    `)
                 }
-            }
+            }).addTo(mapInstanceRef.current)
+
+            // Store control for cleanup
+            mapInstanceRef.current.routingControl = routingControl
         }
 
         // Fit map to show all markers

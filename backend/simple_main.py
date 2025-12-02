@@ -46,8 +46,8 @@ def quick_route(request: QuickRouteRequest):
             {
                 "id": 1,
                 "name": "Parque Kennedy",
-                "latitude": -12.1203,
-                "longitude": -77.0294,
+                "latitude": -12.1218,
+                "longitude": -77.0297,
                 "district": "Miraflores",
                 "category": "Park",
                 "popularity": 85,
@@ -58,8 +58,8 @@ def quick_route(request: QuickRouteRequest):
             {
                 "id": 2,
                 "name": "Larcomar",
-                "latitude": -12.1344,
-                "longitude": -77.0256,
+                "latitude": -12.1325,
+                "longitude": -77.0350,
                 "district": "Miraflores",
                 "category": "Shopping",
                 "popularity": 90,
@@ -70,8 +70,8 @@ def quick_route(request: QuickRouteRequest):
             {
                 "id": 3,
                 "name": "Puente de los Suspiros",
-                "latitude": -12.1489,
-                "longitude": -77.0219,
+                "latitude": -12.1482,
+                "longitude": -77.0223,
                 "district": "Barranco",
                 "category": "Landmark",
                 "popularity": 85,
