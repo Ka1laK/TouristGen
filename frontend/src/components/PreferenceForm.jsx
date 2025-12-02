@@ -64,7 +64,7 @@ const XIcon = () => (
     </svg>
 )
 
-function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onReset }) {
+function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onReset, t }) {
     const [preferences, setPreferences] = useState({
         max_duration: 480,
         max_budget: 200,
@@ -121,14 +121,14 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
         return (
             <div className="preference-form-compact">
                 <div className="form-header">
-                    <h2>Recomendaciones Listas</h2>
-                    <p className="text-sm text-gray-600">Hemos encontrado lugares geniales para ti.</p>
+                    <h2>{t.recommendationsReady}</h2>
+                    <p className="text-sm text-gray-600">{t.foundPlaces}</p>
                 </div>
 
                 <div className="summary-card">
-                    <p><strong>Inicio:</strong> {preferences.start_location.address || 'Mi Ubicación'}</p>
-                    <p><strong>Duración:</strong> {preferences.max_duration / 60} horas</p>
-                    <p><strong>Presupuesto:</strong> S/ {preferences.max_budget}</p>
+                    <p><strong>{t.startPoint}:</strong> {preferences.start_location.address || t.myLocation}</p>
+                    <p><strong>{t.duration}:</strong> {preferences.max_duration / 60} {t.hours}</p>
+                    <p><strong>{t.budget}:</strong> S/ {preferences.max_budget}</p>
                 </div>
 
                 <button
@@ -140,7 +140,7 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
                     {loading ? (
                         <>
                             <span className="loading-spinner"></span>
-                            <span>Generando Ruta...</span>
+                            <span>{t.generating}</span>
                         </>
                     ) : (
                         <>
@@ -148,7 +148,7 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
                                 <path d="M5 12h14" />
                                 <path d="m12 5 7 7-7 7" />
                             </svg>
-                            <span>Generar Ruta Final</span>
+                            <span>{t.generateRoute}</span>
                         </>
                     )}
                 </button>
@@ -159,7 +159,7 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
                     onClick={onReset}
                     style={{ marginTop: '0.5rem', width: '100%', padding: '0.75rem', border: '1px solid #cbd5e1', borderRadius: '8px', background: 'white' }}
                 >
-                    Cambiar Filtros
+                    {t.changeFilters}
                 </button>
             </div>
         )
@@ -169,10 +169,10 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
         return (
             <div className="preference-form-compact">
                 <div className="form-header">
-                    <h2>Ruta Generada</h2>
+                    <h2>{t.routeGenerated}</h2>
                 </div>
                 <div className="summary-card">
-                    <p>Disfruta tu recorrido por Lima.</p>
+                    <p>{t.enjoyTrip}</p>
                 </div>
                 <button
                     type="button"
@@ -180,7 +180,7 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
                     onClick={onReset}
                     style={{ marginTop: '0.5rem', width: '100%', padding: '0.75rem', border: '1px solid #cbd5e1', borderRadius: '8px', background: 'white' }}
                 >
-                    Nueva Búsqueda
+                    {t.newSearch}
                 </button>
             </div>
         )
@@ -189,7 +189,7 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
     return (
         <form className="preference-form-compact" onSubmit={handleSubmit}>
             <div className="form-header">
-                <h2>Configuración de Ruta</h2>
+                <h2>{t.configTitle}</h2>
             </div>
 
             {error && (
@@ -202,7 +202,7 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
             <div className="form-group-compact">
                 <label className="form-label-icon">
                     <MapPinIcon />
-                    <span>Punto de Partida</span>
+                    <span>{t.startPoint}</span>
                 </label>
                 <LocationSearch
                     onLocationSelect={handleLocationSelect}
@@ -214,17 +214,17 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
             <div className="form-group-compact">
                 <label className="form-label-icon">
                     <ClockIcon />
-                    <span>Duración</span>
+                    <span>{t.duration}</span>
                 </label>
                 <select
                     className="form-select"
                     value={preferences.max_duration}
                     onChange={(e) => handleChange('max_duration', parseInt(e.target.value))}
                 >
-                    <option value="180">3 horas (medio día)</option>
-                    <option value="300">5 horas</option>
-                    <option value="480">8 horas (día completo)</option>
-                    <option value="600">10 horas</option>
+                    <option value="180">3 {t.hours} ({t.halfDay})</option>
+                    <option value="300">5 {t.hours}</option>
+                    <option value="480">8 {t.hours} ({t.fullDay})</option>
+                    <option value="600">10 {t.hours}</option>
                 </select>
             </div>
 
@@ -232,18 +232,18 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
             <div className="form-group-compact">
                 <label className="form-label-icon">
                     <WalletIcon />
-                    <span>Presupuesto</span>
+                    <span>{t.budget}</span>
                 </label>
                 <select
                     className="form-select"
                     value={preferences.max_budget}
                     onChange={(e) => handleChange('max_budget', parseFloat(e.target.value))}
                 >
-                    <option value="50">S/ 50 (económico)</option>
+                    <option value="50">S/ 50 ({t.economic})</option>
                     <option value="100">S/ 100</option>
                     <option value="200">S/ 200</option>
                     <option value="300">S/ 300</option>
-                    <option value="500">S/ 500 (premium)</option>
+                    <option value="500">S/ 500 ({t.premium})</option>
                 </select>
             </div>
 
@@ -251,7 +251,7 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
             <div className="form-group-compact">
                 <label className="form-label-icon">
                     <ClockIcon />
-                    <span>Hora de Inicio</span>
+                    <span>{t.startTime}</span>
                 </label>
                 <input
                     type="time"
@@ -266,16 +266,16 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
             <div className="form-group-compact">
                 <label className="form-label-icon">
                     <WalkIcon />
-                    <span>Ritmo</span>
+                    <span>{t.pace}</span>
                 </label>
                 <select
                     className="form-select"
                     value={preferences.user_pace}
                     onChange={(e) => handleChange('user_pace', e.target.value)}
                 >
-                    <option value="slow">Lento (relajado)</option>
-                    <option value="medium">Medio (normal)</option>
-                    <option value="fast">Rápido (dinámico)</option>
+                    <option value="slow">{t.slow}</option>
+                    <option value="medium">{t.medium}</option>
+                    <option value="fast">{t.fast}</option>
                 </select>
             </div>
 
@@ -286,7 +286,7 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
                 onClick={() => setShowAdvanced(!showAdvanced)}
             >
                 <FilterIcon />
-                <span>{showAdvanced ? 'Ocultar' : 'Mostrar'} Filtros Avanzados</span>
+                <span>{showAdvanced ? t.hideFilters : t.showFilters} {t.advancedFilters}</span>
                 <span className="toggle-icon">{showAdvanced ? '▲' : '▼'}</span>
             </button>
 
@@ -295,7 +295,7 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
                 <div className="advanced-options">
                     {/* Mandatory Categories */}
                     <div className="form-group-compact">
-                        <label className="form-label-small">Quiero Visitar</label>
+                        <label className="form-label-small">{t.wantToVisit}</label>
                         <select
                             className="form-select"
                             onChange={(e) => {
@@ -304,10 +304,10 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
                             }}
                             defaultValue=""
                         >
-                            <option value="" disabled>Selecciona una categoría...</option>
+                            <option value="" disabled>{t.selectCategory}</option>
                             {CATEGORIAS.filter(cat => !preferences.mandatory_categories.includes(cat.value)).map(cat => (
                                 <option key={cat.value} value={cat.value}>
-                                    {cat.label}
+                                    {t[cat.value] || cat.label}
                                 </option>
                             ))}
                         </select>
@@ -316,7 +316,7 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
                                 const category = CATEGORIAS.find(c => c.value === cat)
                                 return (
                                     <div key={cat} className="chip chip-primary">
-                                        <span>{category?.label || cat}</span>
+                                        <span>{t[cat] || category?.label || cat}</span>
                                         <button type="button" onClick={() => removeItem('mandatory_categories', cat)}>
                                             <XIcon />
                                         </button>
@@ -328,7 +328,7 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
 
                     {/* Avoid Categories */}
                     <div className="form-group-compact">
-                        <label className="form-label-small">No Me Interesa</label>
+                        <label className="form-label-small">{t.dontInterest}</label>
                         <select
                             className="form-select"
                             onChange={(e) => {
@@ -337,10 +337,10 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
                             }}
                             defaultValue=""
                         >
-                            <option value="" disabled>Selecciona una categoría...</option>
+                            <option value="" disabled>{t.selectCategory}</option>
                             {CATEGORIAS.filter(cat => !preferences.avoid_categories.includes(cat.value)).map(cat => (
                                 <option key={cat.value} value={cat.value}>
-                                    {cat.label}
+                                    {t[cat.value] || cat.label}
                                 </option>
                             ))}
                         </select>
@@ -349,7 +349,7 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
                                 const category = CATEGORIAS.find(c => c.value === cat)
                                 return (
                                     <div key={cat} className="chip chip-danger">
-                                        <span>{category?.label || cat}</span>
+                                        <span>{t[cat] || category?.label || cat}</span>
                                         <button type="button" onClick={() => removeItem('avoid_categories', cat)}>
                                             <XIcon />
                                         </button>
@@ -361,7 +361,7 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
 
                     {/* Preferred Districts */}
                     <div className="form-group-compact">
-                        <label className="form-label-small">Distritos Preferidos</label>
+                        <label className="form-label-small">{t.preferredDistricts}</label>
                         <select
                             className="form-select"
                             onChange={(e) => {
@@ -370,7 +370,7 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
                             }}
                             defaultValue=""
                         >
-                            <option value="" disabled>Selecciona un distrito...</option>
+                            <option value="" disabled>{t.selectDistrict}</option>
                             {DISTRITOS.filter(d => !preferences.preferred_districts.includes(d)).map(district => (
                                 <option key={district} value={district}>
                                     {district}
@@ -400,7 +400,7 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
                 {loading ? (
                     <>
                         <span className="loading-spinner"></span>
-                        <span>Buscando...</span>
+                        <span>{t.searching}</span>
                     </>
                 ) : (
                     <>
@@ -408,13 +408,13 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
                             <circle cx="11" cy="11" r="8" />
                             <line x1="21" y1="21" x2="16.65" y2="16.65" />
                         </svg>
-                        <span>Buscar Recomendaciones</span>
+                        <span>{t.searchButton}</span>
                     </>
                 )}
             </button>
 
             <small className="form-footer">
-                Paso 1: Encuentra lugares increíbles
+                {t.step1}
             </small>
         </form>
     )

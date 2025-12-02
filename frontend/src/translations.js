@@ -1,0 +1,174 @@
+export const translations = {
+    es: {
+        // Header
+        appTitle: "TouristGen Pro",
+        appSubtitle: "Planificador Inteligente de Rutas Turísticas para Lima y Callao",
+
+        // Preference Form
+        configTitle: "Configuración de Ruta",
+        startPoint: "Punto de Partida",
+        duration: "Duración",
+        budget: "Presupuesto",
+        startTime: "Hora de Inicio",
+        pace: "Ritmo",
+        advancedFilters: "Filtros Avanzados",
+        showFilters: "Mostrar",
+        hideFilters: "Ocultar",
+        wantToVisit: "Quiero Visitar",
+        dontInterest: "No Me Interesa",
+        preferredDistricts: "Distritos Preferidos",
+        searchButton: "Buscar Recomendaciones",
+        searching: "Buscando...",
+        step1: "Paso 1: Encuentra lugares increíbles",
+        selectCategory: "Selecciona una categoría...",
+        selectDistrict: "Selecciona un distrito...",
+
+        // Recommendations
+        recommendationsReady: "Recomendaciones Listas",
+        foundPlaces: "Hemos encontrado lugares geniales para ti.",
+        myLocation: "Mi Ubicación",
+        generateRoute: "Generar Ruta Final",
+        generating: "Generando Ruta...",
+        changeFilters: "Cambiar Filtros",
+        recommendedPlaces: "Lugares Recomendados",
+        deleteFromRoute: "Eliminar de la ruta",
+
+        // Routing
+        routeGenerated: "Ruta Generada",
+        enjoyTrip: "Disfruta tu recorrido por Lima.",
+        newSearch: "Nueva Búsqueda",
+        optimizedItinerary: "Itinerario Optimizado",
+        places: "Lugares",
+        cost: "Costo",
+        score: "Puntaje",
+        arrival: "Llegada",
+        departure: "Salida",
+        visit: "Visita",
+        walk: "Caminata",
+        wait: "Espera",
+        price: "Precio",
+        weather: "Clima",
+
+        // Weather Widget
+        currentTime: "Hora Actual",
+        weatherInLima: "Clima en Lima",
+        rainProb: "Probabilidad de Lluvia",
+        wind: "Viento",
+        highProb: "Alta probabilidad",
+        mediumProb: "Probabilidad media",
+        lowProb: "Baja probabilidad",
+        windy: "Ventoso",
+        moderate: "Moderado",
+        loading: "Cargando...",
+
+        // Options
+        hours: "horas",
+        halfDay: "medio día",
+        fullDay: "día completo",
+        economic: "económico",
+        premium: "premium",
+        slow: "Lento (relajado)",
+        medium: "Medio (normal)",
+        fast: "Rápido (dinámico)",
+
+        // Categories
+        Museum: "Museos",
+        Park: "Parques",
+        Beach: "Playas",
+        Shopping: "Centros Comerciales",
+        Dining: "Restaurantes",
+        Religious: "Sitios Religiosos",
+        Landmark: "Monumentos",
+        Zoo: "Zoológicos",
+        Cultural: "Centros Culturales",
+        // Map Overlay
+        startAdventure: "Comienza tu aventura",
+        enterLocation: "Ingresa tu ubicación o selecciona filtros para ver recomendaciones"
+    },
+    en: {
+        // Header
+        appTitle: "TouristGen Pro",
+        appSubtitle: "Intelligent Tourist Route Planner for Lima and Callao",
+
+        // Preference Form
+        configTitle: "Route Configuration",
+        startPoint: "Starting Point",
+        duration: "Duration",
+        budget: "Budget",
+        startTime: "Start Time",
+        pace: "Pace",
+        advancedFilters: "Advanced Filters",
+        showFilters: "Show",
+        hideFilters: "Hide",
+        wantToVisit: "I Want to Visit",
+        dontInterest: "Not Interested",
+        preferredDistricts: "Preferred Districts",
+        searchButton: "Search Recommendations",
+        searching: "Searching...",
+        step1: "Step 1: Find amazing places",
+        selectCategory: "Select a category...",
+        selectDistrict: "Select a district...",
+
+        // Recommendations
+        recommendationsReady: "Recommendations Ready",
+        foundPlaces: "We found great places for you.",
+        myLocation: "My Location",
+        generateRoute: "Generate Final Route",
+        generating: "Generating Route...",
+        changeFilters: "Change Filters",
+        recommendedPlaces: "Recommended Places",
+        deleteFromRoute: "Remove from route",
+
+        // Routing
+        routeGenerated: "Route Generated",
+        enjoyTrip: "Enjoy your trip through Lima.",
+        newSearch: "New Search",
+        optimizedItinerary: "Optimized Itinerary",
+        places: "Places",
+        cost: "Cost",
+        score: "Score",
+        arrival: "Arrival",
+        departure: "Departure",
+        visit: "Visit",
+        walk: "Walk",
+        wait: "Wait",
+        price: "Price",
+        weather: "Weather",
+
+        // Weather Widget
+        currentTime: "Current Time",
+        weatherInLima: "Weather in Lima",
+        rainProb: "Rain Probability",
+        wind: "Wind",
+        highProb: "High probability",
+        mediumProb: "Medium probability",
+        lowProb: "Low probability",
+        windy: "Windy",
+        moderate: "Moderate",
+        loading: "Loading...",
+
+        // Options
+        hours: "hours",
+        halfDay: "half day",
+        fullDay: "full day",
+        economic: "economic",
+        premium: "premium",
+        slow: "Slow (relaxed)",
+        medium: "Medium (normal)",
+        fast: "Fast (dynamic)",
+
+        // Categories
+        Museum: "Museums",
+        Park: "Parks",
+        Beach: "Beaches",
+        Shopping: "Shopping Malls",
+        Dining: "Restaurants",
+        Religious: "Religious Sites",
+        Landmark: "Landmarks",
+        Zoo: "Zoos",
+        Cultural: "Cultural Centers",
+        // Map Overlay
+        startAdventure: "Start your adventure",
+        enterLocation: "Enter your location or select filters to see recommendations"
+    }
+}

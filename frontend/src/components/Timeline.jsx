@@ -1,4 +1,4 @@
-function Timeline({ timeline, totalDuration, totalCost, fitnessScore }) {
+function Timeline({ timeline, totalDuration, totalCost, fitnessScore, t }) {
     if (!timeline || timeline.length === 0) {
         return null
     }
@@ -16,23 +16,23 @@ function Timeline({ timeline, totalDuration, totalCost, fitnessScore }) {
     return (
         <div className="timeline">
             <div className="timeline-header">
-                <h2>📅 Itinerario Optimizado</h2>
+                <h2>📅 {t.optimizedItinerary}</h2>
                 <div className="timeline-stats">
                     <div className="stat-item">
                         <div className="stat-value">{timeline.length}</div>
-                        <div className="stat-label">Lugares</div>
+                        <div className="stat-label">{t.places}</div>
                     </div>
                     <div className="stat-item">
                         <div className="stat-value">{formatTime(totalDuration)}</div>
-                        <div className="stat-label">Duración</div>
+                        <div className="stat-label">{t.duration}</div>
                     </div>
                     <div className="stat-item">
                         <div className="stat-value">{formatCurrency(totalCost)}</div>
-                        <div className="stat-label">Costo</div>
+                        <div className="stat-label">{t.cost}</div>
                     </div>
                     <div className="stat-item">
                         <div className="stat-value">{fitnessScore.toFixed(0)}</div>
-                        <div className="stat-label">Puntaje</div>
+                        <div className="stat-label">{t.score}</div>
                     </div>
                 </div>
             </div>
@@ -45,7 +45,7 @@ function Timeline({ timeline, totalDuration, totalCost, fitnessScore }) {
                         <div className="timeline-poi-name">{item.poi_name}</div>
 
                         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                            <span className="badge badge-category">{item.category}</span>
+                            <span className="badge badge-category">{t[item.category] || item.category}</span>
                             <span className="badge badge-district">{item.district}</span>
                         </div>
 
@@ -53,21 +53,21 @@ function Timeline({ timeline, totalDuration, totalCost, fitnessScore }) {
                             <div className="timeline-detail">
                                 <span>🕐</span>
                                 <span>
-                                    <strong>Llegada:</strong> {item.arrival_time}
+                                    <strong>{t.arrival}:</strong> {item.arrival_time}
                                 </span>
                             </div>
 
                             <div className="timeline-detail">
                                 <span>🕑</span>
                                 <span>
-                                    <strong>Salida:</strong> {item.departure_time}
+                                    <strong>{t.departure}:</strong> {item.departure_time}
                                 </span>
                             </div>
 
                             <div className="timeline-detail">
                                 <span>⏱️</span>
                                 <span>
-                                    <strong>Visita:</strong> {item.visit_duration} min
+                                    <strong>{t.visit}:</strong> {item.visit_duration} min
                                 </span>
                             </div>
 
@@ -75,7 +75,7 @@ function Timeline({ timeline, totalDuration, totalCost, fitnessScore }) {
                                 <div className="timeline-detail">
                                     <span>🚶</span>
                                     <span>
-                                        <strong>Caminata:</strong> {item.travel_time} min
+                                        <strong>{t.walk}:</strong> {item.travel_time} min
                                     </span>
                                 </div>
                             )}
@@ -84,7 +84,7 @@ function Timeline({ timeline, totalDuration, totalCost, fitnessScore }) {
                                 <div className="timeline-detail">
                                     <span>⏳</span>
                                     <span>
-                                        <strong>Espera:</strong> {item.wait_time} min
+                                        <strong>{t.wait}:</strong> {item.wait_time} min
                                     </span>
                                 </div>
                             )}
@@ -92,7 +92,7 @@ function Timeline({ timeline, totalDuration, totalCost, fitnessScore }) {
                             <div className="timeline-detail">
                                 <span>💰</span>
                                 <span>
-                                    <strong>Precio:</strong> {formatCurrency(item.price)}
+                                    <strong>{t.price}:</strong> {formatCurrency(item.price)}
                                 </span>
                             </div>
 
@@ -100,7 +100,7 @@ function Timeline({ timeline, totalDuration, totalCost, fitnessScore }) {
                                 <div className="timeline-detail">
                                     <span>🌡️</span>
                                     <span>
-                                        <strong>Clima:</strong> {item.weather.temperature?.toFixed(1)}°C
+                                        <strong>{t.weather}:</strong> {item.weather.temperature?.toFixed(1)}°C
                                     </span>
                                 </div>
                             )}

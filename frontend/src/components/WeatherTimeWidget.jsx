@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 
-function WeatherTimeWidget() {
+function WeatherTimeWidget({ t, language }) {
     const [currentTime, setCurrentTime] = useState(new Date())
     const [weather, setWeather] = useState(null)
     const [loading, setLoading] = useState(true)
@@ -33,6 +33,8 @@ function WeatherTimeWidget() {
     }
 
     const getWeatherDescription = (code) => {
+        // This could be moved to translations too if needed, but for now we'll keep it simple
+        // or map codes to translation keys
         const weatherCodes = {
             0: { desc: 'Despejado', icon: '☀️' },
             1: { desc: 'Mayormente despejado', icon: '🌤️' },
@@ -53,7 +55,8 @@ function WeatherTimeWidget() {
     }
 
     const formatTime = (date) => {
-        return date.toLocaleTimeString('es-PE', {
+        const locale = language === 'en' ? 'en-US' : 'es-PE'
+        return date.toLocaleTimeString(locale, {
             hour: '2-digit',
             minute: '2-digit',
             second: '2-digit',
@@ -62,7 +65,8 @@ function WeatherTimeWidget() {
     }
 
     const formatDate = (date) => {
-        return date.toLocaleDateString('es-PE', {
+        const locale = language === 'en' ? 'en-US' : 'es-PE'
+        return date.toLocaleDateString(locale, {
             weekday: 'long',
             year: 'numeric',
             month: 'long',
@@ -93,13 +97,20 @@ function WeatherTimeWidget() {
     const weatherInfo = weather ? getWeatherDescription(weather.weather_code) : null
     const rainProb = getRainProbability()
 
+    let rainProbText = t.lowProb
+    if (rainProb > 70) rainProbText = t.highProb
+    else if (rainProb > 30) rainProbText = t.mediumProb
+
+    let windText = t.moderate
+    if (weather?.wind_speed_10m > 20) windText = t.windy
+
     return (
         <div className="weather-time-widget">
             {/* Time Card */}
             <div className="widget-card time-card">
                 <div className="card-icon">🕐</div>
                 <div className="card-content">
-                    <div className="card-title">Hora Actual</div>
+                    <div className="card-title">{t.currentTime}</div>
                     <div className="card-value">{formatTime(currentTime)}</div>
                     <div className="card-subtitle">{formatDate(currentTime)}</div>
                 </div>
@@ -109,11 +120,11 @@ function WeatherTimeWidget() {
             <div className="widget-card weather-card">
                 <div className="card-icon">{weatherInfo?.icon || '🌡️'}</div>
                 <div className="card-content">
-                    <div className="card-title">Clima en Lima</div>
+                    <div className="card-title">{t.weatherInLima}</div>
                     <div className="card-value">
                         {weather?.temperature_2m ? `${Math.round(weather.temperature_2m)}°C` : '--°C'}
                     </div>
-                    <div className="card-subtitle">{weatherInfo?.desc || 'Cargando...'}</div>
+                    <div className="card-subtitle">{weatherInfo?.desc || t.loading}</div>
                 </div>
             </div>
 
@@ -123,10 +134,10 @@ function WeatherTimeWidget() {
                     {rainProb > 70 ? '🌧️' : rainProb > 30 ? '🌦️' : '☀️'}
                 </div>
                 <div className="card-content">
-                    <div className="card-title">Probabilidad de Lluvia</div>
+                    <div className="card-title">{t.rainProb}</div>
                     <div className="card-value">{rainProb}%</div>
                     <div className="card-subtitle">
-                        {rainProb > 70 ? 'Alta probabilidad' : rainProb > 30 ? 'Probabilidad media' : 'Baja probabilidad'}
+                        {rainProbText}
                     </div>
                 </div>
             </div>
@@ -135,12 +146,12 @@ function WeatherTimeWidget() {
             <div className="widget-card wind-card">
                 <div className="card-icon">💨</div>
                 <div className="card-content">
-                    <div className="card-title">Viento</div>
+                    <div className="card-title">{t.wind}</div>
                     <div className="card-value">
                         {weather?.wind_speed_10m ? `${Math.round(weather.wind_speed_10m)} km/h` : '-- km/h'}
                     </div>
                     <div className="card-subtitle">
-                        {weather?.wind_speed_10m > 20 ? 'Ventoso' : 'Moderado'}
+                        {windText}
                     </div>
                 </div>
             </div>

@@ -19,7 +19,7 @@ let DefaultIcon = L.icon({
 
 L.Marker.prototype.options.icon = DefaultIcon
 
-function Map({ route, recommendations, step, startLocation }) {
+function Map({ route, recommendations, step, startLocation, language, t }) {
     const mapRef = useRef(null)
     const mapInstanceRef = useRef(null)
     const markersRef = useRef([])
@@ -129,7 +129,7 @@ function Map({ route, recommendations, step, startLocation }) {
                 waypoints: waypoints,
                 routeWhileDragging: false,
                 fitSelectedRoutes: true,
-                language: 'es', // Set language to Spanish
+                language: language, // Set language dynamically
                 containerClassName: 'routing-instructions', // Custom class for styling
                 lineOptions: {
                     styles: [{ color: '#6366f1', opacity: 0.8, weight: 6 }]
@@ -205,8 +205,8 @@ function Map({ route, recommendations, step, startLocation }) {
                     textAlign: 'center',
                     zIndex: 1000
                 }}>
-                    <h3 style={{ marginBottom: '0.5rem' }}>🗺️ Comienza tu aventura</h3>
-                    <p style={{ color: '#64748b' }}>Ingresa tu ubicación o selecciona filtros para ver recomendaciones</p>
+                    <h3 style={{ marginBottom: '0.5rem' }}>🗺️ {t?.startAdventure || 'Comienza tu aventura'}</h3>
+                    <p style={{ color: '#64748b' }}>{t?.enterLocation || 'Ingresa tu ubicación o selecciona filtros para ver recomendaciones'}</p>
                 </div>
             )}
         </div>
