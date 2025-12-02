@@ -236,6 +236,36 @@ function App() {
                                 totalCost={route.total_cost}
                                 fitnessScore={route.fitness_score}
                                 t={t}
+                                onTimelineUpdate={(newTimeline) => {
+                                    // Recalculate total cost from remaining POIs
+                                    const newTotalCost = newTimeline.reduce((sum, item) => sum + (item.price || 0), 0)
+
+                                    // Recalculate total duration (sum of visit + travel + wait times)
+                                    const newTotalDuration = newTimeline.reduce((sum, item) => {
+                                        return sum + (item.visit_duration || 0) + (item.travel_time || 0) + (item.wait_time || 0)
+                                    }, 0)
+
+                                    // Update route with new timeline and recalculated values
+                                    const updatedRoute = {
+                                        ...route,
+                                        timeline: newTimeline,
+                                        total_cost: newTotalCost,
+                                        total_duration: newTotalDuration,
+                                        // Update route array (POI objects) based on timeline
+                                        route: newTimeline.map(item => ({
+                                            id: item.poi_id,
+                                            name: item.poi_name,
+                                            latitude: item.latitude,
+                                            longitude: item.longitude,
+                                            category: item.category,
+                                            district: item.district,
+                                            rating: item.rating,
+                                            price: item.price
+                                        }))
+                                    }
+
+                                    setRoute(updatedRoute)
+                                }}
                             />
                             <button className="btn-reset-styled" onClick={handleReset}>
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

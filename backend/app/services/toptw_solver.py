@@ -37,6 +37,7 @@ class TOPTWConstraints:
     avoid_categories: List[str]  # Avoid these
     preferred_districts: List[str]  # Prefer these districts
     weather_conditions: Dict[str, any]  # Current weather data
+    transport_mode: str = "driving-car"  # Transport mode for travel time calculations
 
 
 class TOPTWSolver:
@@ -253,8 +254,15 @@ class TOPTWSolver:
         # Earth radius in km
         distance_km = 6371 * c
         
-        # Assume walking speed of 4 km/h
-        time_hours = distance_km / 4.0
+        # Use transport mode from constraints for speed
+        speeds = {
+            "foot-walking": 4.5,      # km/h
+            "cycling-regular": 15.0,
+            "driving-car": 25.0       # Lima city traffic average
+        }
+        speed = speeds.get(self.constraints.transport_mode, 25.0)
+        
+        time_hours = distance_km / speed
         time_minutes = time_hours * 60
         
         return time_minutes
@@ -307,10 +315,61 @@ class TOPTWSolver:
         
         return len(errors) == 0, errors
     
-    def get_route_details(self, route: List[int]) -> Dict:
-        """Get detailed information about a route"""
+    def get_route_details(self, route: List[int], start_location: tuple = None) -> Dict:
+        """Get detailed information about a route
+        
+        Args:
+            route: List of POI indices
+            start_location: Optional (latitude, longitude) tuple for start point
+        """
         if not route:
             return {}
+        
+        # Smart visit duration distribution
+        total_pois = len(route)
+        available_time = self.constraints.max_duration
+        
+        # Calculate total travel time first (including from start if provided)
+        total_travel_time = 0
+        
+        # Add travel time from start location to first POI
+        if start_location:
+            first_poi = self.pois[route[0]]
+            from geopy.distance import geodesic
+            dist_km = geodesic(start_location, (first_poi.latitude, first_poi.longitude)).kilometers
+            speeds = {
+                "foot-walking": 4.5,
+                "cycling-regular": 15.0,
+                "driving-car": 25.0
+            }
+            speed = speeds.get(self.constraints.transport_mode, 25.0)
+            total_travel_time += (dist_km / speed) * 60  # Convert to minutes
+        
+        for i in range(len(route)):
+            if i > 0:
+                prev_idx = route[i-1]
+                poi_idx = route[i]
+                if self.time_matrix is not None:
+                    total_travel_time += self.time_matrix[prev_idx][poi_idx]
+                else:
+                    total_travel_time += self._estimate_travel_time(self.pois[prev_idx], self.pois[poi_idx])
+        
+        # Time available for visits (excluding travel)
+        visit_time_budget = available_time - total_travel_time
+        
+        # Distribute visit time intelligently based on POI importance
+        visit_durations = {}
+        total_importance = sum(poi.popularity for poi in [self.pois[idx] for idx in route])
+        
+        for poi_idx in route:
+            poi = self.pois[poi_idx]
+            # Allocate time proportional to popularity, with min/max bounds
+            if total_importance > 0:
+                allocated_time = (poi.popularity / total_importance) * visit_time_budget
+                # Bounds: minimum 30 min, maximum 180 min (3 hours)
+                visit_durations[poi_idx] = max(30, min(180, int(allocated_time)))
+            else:
+                visit_durations[poi_idx] = poi.visit_duration
         
         timeline = []
         current_time = self.constraints.start_time
@@ -322,7 +381,19 @@ class TOPTWSolver:
             
             # Travel time
             travel_time = 0
-            if i > 0:
+            if i == 0 and start_location:
+                # Calculate travel from start location to first POI
+                from geopy.distance import geodesic
+                dist_km = geodesic(start_location, (poi.latitude, poi.longitude)).kilometers
+                speeds = {
+                    "foot-walking": 4.5,
+                    "cycling-regular": 15.0,
+                    "driving-car": 25.0
+                }
+                speed = speeds.get(self.constraints.transport_mode, 25.0)
+                travel_time = (dist_km / speed) * 60  # Convert to minutes
+                current_time += travel_time
+            elif i > 0:
                 prev_idx = route[i-1]
                 if self.time_matrix is not None:
                     travel_time = self.time_matrix[prev_idx][poi_idx]
@@ -333,25 +404,35 @@ class TOPTWSolver:
             
             # Adjust for opening time
             arrival_time = current_time
+            wait_time = 0
             if current_time < poi.opening_time:
+                wait_time = poi.opening_time - current_time
                 current_time = poi.opening_time
             
-            # Visit
-            departure_time = current_time + poi.visit_duration
+            # Use smart visit duration
+            smart_visit_duration = visit_durations.get(poi_idx, poi.visit_duration)
+            departure_time = current_time + smart_visit_duration
+            
+            # Determine if location is free (price_level 0 or price 0)
+            is_free = (poi.price == 0 or poi.price == 0.0 or 
+                      (hasattr(poi, 'price_level') and poi.price_level == 0))
             
             timeline.append({
                 "poi_id": poi.id,
                 "poi_name": poi.name,
                 "category": poi.category,
                 "district": poi.district,
+                "rating": poi.rating,  # Add rating for star display
                 "arrival_time": self._minutes_to_time_string(arrival_time),
                 "departure_time": self._minutes_to_time_string(departure_time),
-                "visit_duration": poi.visit_duration,
+                "visit_duration": smart_visit_duration,
                 "travel_time": int(travel_time),
-                "wait_time": max(0, poi.opening_time - arrival_time),
+                "wait_time": int(wait_time) if wait_time > 0 else 0,  # Convert to int
                 "price": poi.price,
                 "latitude": poi.latitude,
-                "longitude": poi.longitude
+                "longitude": poi.longitude,
+                "transport_mode": self.constraints.transport_mode,
+                "is_free": is_free
             })
             
             current_time = departure_time

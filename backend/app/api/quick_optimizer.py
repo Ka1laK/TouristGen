@@ -28,6 +28,7 @@ class QuickOptimizationRequest(BaseModel):
     preferred_districts: List[str] = Field(default=[], description="Preferred districts")
     start_location: Optional[Dict] = Field(None, description="Start location")
     selected_poi_ids: Optional[List[int]] = Field(None, description="Specific POI IDs to include in route")
+    transport_mode: str = Field("driving-car", description="Transport mode")
 
 
 def get_route_geometry(coordinates: List[tuple], profile="foot-walking") -> List[Dict]:
@@ -304,6 +305,24 @@ def recommend_pois(
                  return {"pois": [], "count": 0, "message": "No places found in this district"}
             
             raise HTTPException(status_code=404, detail="No POIs found")
+        
+        # Smart filtering by budget and time
+        # Filter POIs that fit within budget
+        if request.max_budget:
+            affordable_pois = [poi for poi in pois if poi.price_level * 10 <= request.max_budget]
+            if affordable_pois:
+                pois = affordable_pois
+                logger.info(f"Filtered to {len(pois)} affordable POIs (budget: {request.max_budget})")
+        
+        # Estimate how many POIs can fit in available time
+        if request.max_duration:
+            avg_visit_time = 60  # Average 60 minutes per POI
+            avg_travel_time = 15 if request.transport_mode == "driving-car" else 20  # Travel between POIs
+            time_per_poi = avg_visit_time + avg_travel_time
+            max_pois = max(3, int(request.max_duration / time_per_poi))
+            logger.info(f"Limiting to {max_pois} POIs based on available time ({request.max_duration} min)")
+        else:
+            max_pois = 10
             
         # Filter by categories (if not already done in Logic 1)
         if start_lat is None:
@@ -313,8 +332,8 @@ def recommend_pois(
             if request.avoid_categories:
                 pois = [poi for poi in pois if poi.category not in request.avoid_categories]
                 
-            # Sort by popularity and take top 10
-            pois = sorted(pois, key=lambda x: x.popularity, reverse=True)[:10]
+            # Sort by popularity and apply limit
+            pois = sorted(pois, key=lambda x: x.popularity, reverse=True)[:max_pois]
         
         return {
             "pois": [poi.to_dict() for poi in pois],

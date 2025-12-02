@@ -22,6 +22,9 @@ export const translations = {
         step1: "Paso 1: Encuentra lugares increíbles",
         selectCategory: "Selecciona una categoría...",
         selectDistrict: "Selecciona un distrito...",
+        transportMode: "Modo de Transporte",
+        byCar: "En Auto",
+        onFoot: "A Pie",
 
         // Recommendations
         recommendationsReady: "Recomendaciones Listas",
@@ -41,11 +44,16 @@ export const translations = {
         places: "Lugares",
         cost: "Costo",
         score: "Puntaje",
+        totalDuration: "Duración Total",
         arrival: "Llegada",
         departure: "Salida",
         visit: "Visita",
+        visitTime: "Tiempo en el lugar",
         walk: "Caminata",
+        travelTime: "Viaje",
+        travelToFirst: "Viaje al 1er lugar",
         wait: "Espera",
+        waitingTime: "Espera (lugar cerrado)",
         price: "Precio",
         weather: "Clima",
 
@@ -108,6 +116,9 @@ export const translations = {
         step1: "Step 1: Find amazing places",
         selectCategory: "Select a category...",
         selectDistrict: "Select a district...",
+        transportMode: "Transport Mode",
+        byCar: "By Car",
+        onFoot: "On Foot",
 
         // Recommendations
         recommendationsReady: "Recommendations Ready",
@@ -127,11 +138,16 @@ export const translations = {
         places: "Places",
         cost: "Cost",
         score: "Score",
+        totalDuration: "Total Duration",
         arrival: "Arrival",
         departure: "Departure",
         visit: "Visit",
+        visitTime: "Time at location",
         walk: "Walk",
+        travelTime: "Travel",
+        travelToFirst: "Travel to 1st place",
         wait: "Wait",
+        waitingTime: "Wait (place closed)",
         price: "Price",
         weather: "Weather",
 

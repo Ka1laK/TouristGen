@@ -112,13 +112,13 @@ class RoutesService:
         n = len(coordinates)
         matrix = np.zeros((n, n))
         
-        # Speed in km/h
+        # Speed in km/h - Updated for realistic Lima traffic
         speeds = {
-            "foot-walking": 4.0,
+            "foot-walking": 4.5,      # Average walking speed
             "cycling-regular": 15.0,
-            "driving-car": 30.0
+            "driving-car": 25.0       # Lima city traffic average (more realistic)
         }
-        speed = speeds.get(profile, 4.0)
+        speed = speeds.get(profile, 4.5)
         
         for i in range(n):
             for j in range(n):

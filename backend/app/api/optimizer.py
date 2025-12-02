@@ -30,6 +30,7 @@ class OptimizationRequest(BaseModel):
     preferred_districts: List[str] = Field(default=[], description="Preferred districts")
     start_location: Optional[Dict[str, float]] = Field(None, description="Starting location {lat, lon}")
     selected_poi_ids: Optional[List[int]] = Field(None, description="Pre-selected POI IDs to optimize")
+    transport_mode: str = Field("driving-car", description="Transport mode", pattern="^(driving-car|foot-walking)$")
 
 
 class TimelineItem(BaseModel):
@@ -170,13 +171,14 @@ async def generate_route(
             mandatory_categories=request.mandatory_categories,
             avoid_categories=request.avoid_categories,
             preferred_districts=request.preferred_districts,
-            weather_conditions=weather_data or {}
+            weather_conditions=weather_data or {},
+            transport_mode=request.transport_mode
         )
         
         # Calculate distance matrix
-        logger.info(f"Calculating distance matrix for {len(poi_nodes)} POIs...")
+        logger.info(f"Calculating distance matrix for {len(poi_nodes)} POIs using {request.transport_mode}...")
         coordinates = [(poi.latitude, poi.longitude) for poi in poi_nodes]
-        time_matrix = routes_service.get_distance_matrix(coordinates, profile="foot-walking")
+        time_matrix = routes_service.get_distance_matrix(coordinates, profile=request.transport_mode)
         
         logger.info(f"Calculated distance matrix: {time_matrix.shape}")
         
@@ -216,8 +218,16 @@ async def generate_route(
         
         logger.info(f"Optimization complete. Best fitness: {best_fitness:.2f}")
         
-        # Get route details
-        route_details = solver.get_route_details(best_route)
+        # Extract start location coordinates if provided
+        start_loc_coords = None
+        if request.start_location:
+            start_loc_coords = (
+                request.start_location.get('latitude'),
+                request.start_location.get('longitude')
+            )
+        
+        # Get route details with start location
+        route_details = solver.get_route_details(best_route, start_location=start_loc_coords)
         
         # Generate route ID
         route_id = f"route_{datetime.now().strftime('%Y%m%d_%H%M%S')}"

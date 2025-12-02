@@ -73,6 +73,7 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
         mandatory_categories: [],
         avoid_categories: [],
         preferred_districts: [],
+        transport_mode: 'driving-car',  // Default: Auto
         start_location: {
             address: '',
             latitude: null,
@@ -262,22 +263,79 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
                 />
             </div>
 
-            {/* Pace */}
+            {/* Transport Mode */}
             <div className="form-group-compact">
                 <label className="form-label-icon">
-                    <WalkIcon />
-                    <span>{t.pace}</span>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M5 17h14v-2a3 3 0 0 0-3-3H8a3 3 0 0 0-3 3v2z" />
+                        <path d="M8 12V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v6" />
+                        <circle cx="8.5" cy="17.5" r="1.5" />
+                        <circle cx="15.5" cy="17.5" r="1.5" />
+                    </svg>
+                    <span>{t.transportMode || "Modo de transporte"}</span>
                 </label>
-                <select
-                    className="form-select"
-                    value={preferences.user_pace}
-                    onChange={(e) => handleChange('user_pace', e.target.value)}
-                >
-                    <option value="slow">{t.slow}</option>
-                    <option value="medium">{t.medium}</option>
-                    <option value="fast">{t.fast}</option>
-                </select>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                        type="button"
+                        className={`btn-transport ${preferences.transport_mode === 'driving-car' ? 'active' : ''}`}
+                        onClick={() => handleChange('transport_mode', 'driving-car')}
+                        style={{
+                            flex: 1,
+                            padding: '0.75rem',
+                            border: preferences.transport_mode === 'driving-car' ? '2px solid #3b82f6' : '1px solid #cbd5e1',
+                            borderRadius: '8px',
+                            background: preferences.transport_mode === 'driving-car' ? '#eff6ff' : 'white',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.5rem',
+                            fontWeight: preferences.transport_mode === 'driving-car' ? '600' : '400'
+                        }}
+                    >
+                        🚗 {t.byCar || "En auto"}
+                    </button>
+                    <button
+                        type="button"
+                        className={`btn-transport ${preferences.transport_mode === 'foot-walking' ? 'active' : ''}`}
+                        onClick={() => handleChange('transport_mode', 'foot-walking')}
+                        style={{
+                            flex: 1,
+                            padding: '0.75rem',
+                            border: preferences.transport_mode === 'foot-walking' ? '2px solid #3b82f6' : '1px solid #cbd5e1',
+                            borderRadius: '8px',
+                            background: preferences.transport_mode === 'foot-walking' ? '#eff6ff' : 'white',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.5rem',
+                            fontWeight: preferences.transport_mode === 'foot-walking' ? '600' : '400'
+                        }}
+                    >
+                        🚶 {t.onFoot || "A pie"}
+                    </button>
+                </div>
             </div>
+
+            {/* Pace - Only show when walking */}
+            {preferences.transport_mode === 'foot-walking' && (
+                <div className="form-group-compact">
+                    <label className="form-label-icon">
+                        <WalkIcon />
+                        <span>{t.pace}</span>
+                    </label>
+                    <select
+                        className="form-select"
+                        value={preferences.user_pace}
+                        onChange={(e) => handleChange('user_pace', e.target.value)}
+                    >
+                        <option value="slow">{t.slow}</option>
+                        <option value="medium">{t.medium}</option>
+                        <option value="fast">{t.fast}</option>
+                    </select>
+                </div>
+            )}
 
             {/* Advanced Options Toggle */}
             <button
@@ -305,7 +363,10 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
                             defaultValue=""
                         >
                             <option value="" disabled>{t.selectCategory}</option>
-                            {CATEGORIAS.filter(cat => !preferences.mandatory_categories.includes(cat.value)).map(cat => (
+                            {CATEGORIAS.filter(cat =>
+                                !preferences.mandatory_categories.includes(cat.value) &&
+                                !preferences.avoid_categories.includes(cat.value)  // Exclude if in avoid list
+                            ).map(cat => (
                                 <option key={cat.value} value={cat.value}>
                                     {t[cat.value] || cat.label}
                                 </option>
@@ -338,7 +399,10 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
                             defaultValue=""
                         >
                             <option value="" disabled>{t.selectCategory}</option>
-                            {CATEGORIAS.filter(cat => !preferences.avoid_categories.includes(cat.value)).map(cat => (
+                            {CATEGORIAS.filter(cat =>
+                                !preferences.avoid_categories.includes(cat.value) &&
+                                !preferences.mandatory_categories.includes(cat.value)  // Exclude if in mandatory list
+                            ).map(cat => (
                                 <option key={cat.value} value={cat.value}>
                                     {t[cat.value] || cat.label}
                                 </option>

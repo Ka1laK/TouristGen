@@ -61,9 +61,14 @@ class GeneticAlgorithm:
             return
         
         for _ in range(self.population_size):
-            # Random route length (between 3 and min(12, num_pois))
+            # Random route length - ensure we don't request more POIs than available
             max_route_length = min(12, num_pois)
-            route_length = random.randint(3, max_route_length)
+            min_route_length = min(3, num_pois)  # Can't require 3 if we only have 1-2 POIs
+            
+            if max_route_length < min_route_length:
+                route_length = max_route_length
+            else:
+                route_length = random.randint(min_route_length, max_route_length)
             
             # Create random route
             route = random.sample(range(num_pois), min(route_length, num_pois))
