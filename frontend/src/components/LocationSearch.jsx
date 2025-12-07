@@ -32,21 +32,21 @@ function LocationSearch({ onLocationSelect, initialValue = '' }) {
     const searchLocation = async (query) => {
         setLoading(true)
         try {
-            // Using Nominatim (OpenStreetMap) for geocoding
+            // Use backend proxy to avoid CORS issues
             const response = await fetch(
-                `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}, Lima, Peru&format=json&limit=5&addressdetails=1`,
-                {
-                    headers: {
-                        'User-Agent': 'TouristGen/1.0'
-                    }
-                }
+                `http://localhost:8000/api/geocoding/search?q=${encodeURIComponent(query)}&limit=5`
             )
+
+            if (!response.ok) {
+                throw new Error('Geocoding request failed')
+            }
+
             const data = await response.json()
 
             setSuggestions(data.map(item => ({
                 display_name: item.display_name,
-                lat: parseFloat(item.lat),
-                lon: parseFloat(item.lon),
+                lat: item.lat,
+                lon: item.lon,
                 address: item.address
             })))
             setShowSuggestions(true)
@@ -74,16 +74,16 @@ function LocationSearch({ onLocationSelect, initialValue = '' }) {
                 async (position) => {
                     const { latitude, longitude } = position.coords
 
-                    // Reverse geocode to get address
+                    // Reverse geocode to get address using backend proxy
                     try {
                         const response = await fetch(
-                            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
-                            {
-                                headers: {
-                                    'User-Agent': 'TouristGen/1.0'
-                                }
-                            }
+                            `http://localhost:8000/api/geocoding/reverse?lat=${latitude}&lon=${longitude}`
                         )
+
+                        if (!response.ok) {
+                            throw new Error('Reverse geocoding failed')
+                        }
+
                         const data = await response.json()
 
                         setSearchTerm(data.display_name)

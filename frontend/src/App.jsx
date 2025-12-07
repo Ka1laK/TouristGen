@@ -34,7 +34,7 @@ function App() {
             }, 30000) // 30s timeout to allow for Google API auto-fetch
 
             try {
-                const response = await fetch('http://localhost:8004/api/optimize/recommend-pois', {
+                const response = await fetch('http://localhost:8000/api/optimize/recommend-pois', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -98,7 +98,7 @@ function App() {
             }
 
             // Use advanced optimization endpoint
-            const response = await fetch('http://localhost:8004/api/optimize/generate-route', {
+            const response = await fetch('http://localhost:8000/api/optimize/generate-route', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

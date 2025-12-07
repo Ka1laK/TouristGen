@@ -48,18 +48,54 @@
     margin: 0 0.25rem;
 }
 
-@media (max-width: 768px) {
+/* Mobile: Compact language switcher */
+@media (max-width: 639px) {
     .language-switcher {
-        top: 1rem;
-        right: 1rem;
-        padding: 0.2rem;
+        top: 0.5rem;
+        right: 0.5rem;
+        padding: 0.1rem;
+        border-radius: 12px;
     }
 
     .lang-btn {
-        padding: 0.4rem 0.6rem;
+        padding: 0.25rem 0.3rem;
+        font-size: 0.7rem;
+        border-radius: 10px;
+    }
+
+    .lang-btn .flag {
+        font-size: 0.85rem;
     }
 
     .lang-code {
         display: none;
+    }
+
+    .divider {
+        height: 14px;
+        margin: 0 0.1rem;
+    }
+}
+
+/* Extra small mobile: Even more compact */
+@media (max-width: 374px) {
+    .language-switcher {
+        top: 0.4rem;
+        right: 0.4rem;
+        padding: 0.08rem;
+        border-radius: 10px;
+    }
+
+    .lang-btn {
+        padding: 0.2rem 0.25rem;
+    }
+
+    .lang-btn .flag {
+        font-size: 0.75rem;
+    }
+
+    .divider {
+        height: 12px;
+        margin: 0 0.08rem;
     }
 }
