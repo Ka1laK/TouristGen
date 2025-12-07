@@ -12,6 +12,7 @@ import requests
 
 from app.database import get_db
 from app.services.poi_service import POIService
+from app.services.maps_service import LimaPlacesExtractor
 from app.config import settings
 
 router = APIRouter()
@@ -267,6 +268,23 @@ def recommend_pois(
         
         if start_lat is not None and start_lon is not None:
             logger.info(f"Using start location for recommendations: {start_lat}, {start_lon}")
+            
+            # --- AUTO-FETCH LOGIC ---
+            # Check if we have enough POIs nearby. If not, fetch from Google.
+            nearby_count = poi_service.count_pois_near(start_lat, start_lon, radius_km=3.0)
+            
+            if nearby_count < 5:
+                # Trigger auto-fetch from Google Places API for new areas
+                logger.warning(f"LOW POI COUNT ({nearby_count}) near ({start_lat}, {start_lon}). TRIGGERING AUTO-FETCH...")
+                extractor = LimaPlacesExtractor()
+                try:
+                    # Sync fetch (may take 5-15 seconds for Google API)
+                    fetched_count = extractor.fetch_pois_by_coordinates(start_lat, start_lon, radius=3000)
+                    logger.warning(f"AUTO-FETCH COMPLETE. Added/Updated {fetched_count} POIs.")
+                except Exception as exc:
+                    logger.error(f"Auto-fetch failed: {exc}")
+            # ------------------------
+            
             all_pois = poi_service.get_all_pois()
             
             # Calculate distance to each POI

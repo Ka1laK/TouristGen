@@ -10,7 +10,8 @@ class Settings(BaseSettings):
     
     # API Keys (optional)
     openrouteservice_api_key: str = ""
-    openweather_api_key: str = ""
+    google_maps_api_key: str = ""
+    openweather_api_key: str = "" # Ya no se usa
     
     # Application
     debug: bool = True
@@ -20,8 +21,12 @@ class Settings(BaseSettings):
     # CORS
     allowed_origins: List[str] = [
         "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:5175",
         "http://localhost:3000",
         "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        "http://127.0.0.1:5175",
         "http://127.0.0.1:3000"
     ]
     

@@ -12,6 +12,7 @@ from app.services.weather_service import WeatherService
 from app.services.routes_service import RoutesService
 from app.services.ga_optimizer import GeneticAlgorithm
 from app.services.toptw_solver import POINode, TOPTWConstraints
+from app.services.maps_service import LimaPlacesExtractor
 from app.config import settings
 from app.models.feedback import Feedback
 
@@ -96,6 +97,25 @@ async def generate_route(
         weather_service = WeatherService()
         routes_service = RoutesService(api_key=settings.openrouteservice_api_key)
         
+        # --- AUTO-FETCH LOGIC ---
+        # If start_location is provided, check if we have POIs nearby. 
+        # If not, fetch from Google before proceeding.
+        if request.start_location:
+            lat = request.start_location["latitude"]
+            lon = request.start_location["longitude"]
+            
+            # Check DB count within ~2km (approx 0.018 degrees)
+            nearby_count = poi_service.count_pois_near(lat, lon, radius_km=2.0)
+            logger.info(f"POIs found near start location ({lat}, {lon}): {nearby_count}")
+            
+            if nearby_count < 5:
+                logger.info("Low POI count detected. Triggering Auto-Fetch from Google...")
+                extractor = LimaPlacesExtractor()
+                # Run synchronously to ensure data is available for this request
+                extractor.fetch_pois_by_coordinates(lat, lon, radius=2500)
+                logger.info("Auto-Fetch complete.")
+        # ------------------------
+        
         # Get POIs based on preferences
         # If user has pre-selected specific POIs (from recommendations), use only those
         if request.selected_poi_ids:
@@ -104,18 +124,42 @@ async def generate_route(
             pois = [poi for poi in pois if poi is not None]  # Filter out None values
         else:
             # Otherwise, filter by districts and get top POIs
+            # 1. Get filtered POIs by district/preferences
             pois = poi_service.filter_pois(
                 districts=request.preferred_districts if request.preferred_districts else None,
                 categories=None,  # Don't filter categories here, let GA handle it
                 min_rating=3.0  # Only consider reasonably rated POIs
             )
             
+            # 2. ESSENTIAL: Explicitly add POIs near the start location (in case district filter missed them)
+            # This fixes the issue where "Unknown District" POIs or border POIs were excluded
+            if request.start_location:
+                 nearby_db_pois = poi_service.get_all_pois() # We could optimize this query
+                 # Filter manually for distance
+                 lat_start = request.start_location["latitude"]
+                 lon_start = request.start_location["longitude"]
+                 
+                 # Add any valid POI within 3km of start
+                 nearby_matches = []
+                 for p in nearby_db_pois:
+                     dist = ((p.latitude - lat_start)**2 + (p.longitude - lon_start)**2)**0.5
+                     # Approx 0.027 degrees is ~3km
+                     if dist < 0.027 and p.is_active:
+                         nearby_matches.append(p)
+                 
+                 # Merge without duplicates
+                 existing_ids = {p.id for p in pois}
+                 for np in nearby_matches:
+                     if np.id not in existing_ids:
+                         pois.append(np)
+                         logger.info(f"Added nearby POI to optimization candidates: {np.name}")
+
             if not pois:
                 raise HTTPException(status_code=404, detail="No POIs found matching criteria")
             
             # OPTIMIZATION: Limit to top 15 most popular POIs to speed up calculation
             # Sort by popularity and take top 15
-            pois = sorted(pois, key=lambda x: x.popularity, reverse=True)[:15]
+            pois = sorted(pois, key=lambda x: x.popularity, reverse=True)[:20]
         
         logger.info(f"Found {len(pois)} POIs for optimization")
         

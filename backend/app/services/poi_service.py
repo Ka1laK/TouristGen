@@ -202,3 +202,20 @@ class POIService:
         ).group_by(POI.district).all()
         
         return {district: count for district, count in results}
+
+    def count_pois_near(self, lat: float, lon: float, radius_km: float = 2.0) -> int:
+        """
+        Count active POIs within a rough radius of coordinates.
+        Uses simple box approximation for speed (1 deg lat ~= 111km).
+        """
+        # Roughly: 1km ~= 0.009 degrees latitude
+        deg_radius = radius_km / 111.0
+        
+        # Simple bounding box query
+        count = self.db.query(POI).filter(
+            POI.is_active == True,
+            POI.latitude.between(lat - deg_radius, lat + deg_radius),
+            POI.longitude.between(lon - deg_radius, lon + deg_radius)
+        ).count()
+        
+        return count

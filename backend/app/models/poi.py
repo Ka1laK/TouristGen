@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Float, JSON, Boolean, Text
+from sqlalchemy import Column, Integer, String, Float, JSON, Boolean, Text, DateTime
 from app.database import Base
+from datetime import datetime
 
 class POI(Base):
     """Point of Interest model"""
@@ -32,6 +33,7 @@ class POI(Base):
     
     # Status
     is_active = Column(Boolean, default=True)
+    last_synced_at = Column(DateTime, default=datetime.utcnow)
     
     # Learning weights (adjusted based on feedback)
     learned_popularity = Column(Float, default=1.0)  # Multiplier based on user feedback
