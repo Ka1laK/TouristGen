@@ -205,7 +205,15 @@ def generate_quick_route(
                 "wait_time": 0,
                 "price": float(poi.price_level * 10),
                 "latitude": poi.latitude,
-                "longitude": poi.longitude
+                "longitude": poi.longitude,
+                # Contact information for POI detail modal
+                "phone": poi.phone,
+                "website": poi.website,
+                "address": poi.address,
+                "description": poi.description,
+                "rating": poi.rating,
+                "opening_hours": poi.opening_hours,
+                "popularity": poi.popularity
             })
             
             current_time_minutes = departure + travel_time

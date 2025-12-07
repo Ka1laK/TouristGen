@@ -1,8 +1,11 @@
 import { useState } from 'react'
+import POIDetailModal from './POIDetailModal'
 
 function Timeline({ timeline: initialTimeline, totalDuration, totalCost, fitnessScore, t, onTimelineUpdate }) {
     const [timeline, setTimeline] = useState(initialTimeline || [])
-    const [visitedPOIs, setVisitedPOIs] = useState(new Set())
+    const [selectedPOI, setSelectedPOI] = useState(null)
+    const [isModalOpen, setIsModalOpen] = useState(false)
+    const [deleteConfirmIndex, setDeleteConfirmIndex] = useState(null)
 
     if (!timeline || timeline.length === 0) {
         return null
@@ -11,7 +14,7 @@ function Timeline({ timeline: initialTimeline, totalDuration, totalCost, fitness
     const formatTime = (minutes) => {
         const hours = Math.floor(minutes / 60)
         const mins = Math.round(minutes % 60)
-        return `${hours}h ${mins}m`
+        return `${hours.toString().padStart(2, '0')}h ${mins.toString().padStart(2, '0')}m`
     }
 
     const formatCurrency = (amount) => {
@@ -35,29 +38,14 @@ function Timeline({ timeline: initialTimeline, totalDuration, totalCost, fitness
         return stars
     }
 
-    // Calculate travel time to first POI - ensure it's not 0
     const firstPOITravelTime = timeline[0]?.travel_time || 0
-
-    // If travel_time is 0 but we have coordinates, it means backend didn't calculate it
-    // Show a message or use a default
     const displayTravelTime = firstPOITravelTime > 0 ? formatTime(firstPOITravelTime) : "Calculando..."
 
-    const handleMarkVisited = (index) => {
-        const newVisited = new Set(visitedPOIs)
-        if (newVisited.has(index)) {
-            newVisited.delete(index)
-        } else {
-            newVisited.add(index)
-        }
-        setVisitedPOIs(newVisited)
-    }
-
-    const handleRemoveVisited = () => {
-        const newTimeline = timeline.filter((_, index) => !visitedPOIs.has(index))
+    const handleDeletePOI = (index) => {
+        const newTimeline = timeline.filter((_, i) => i !== index)
         setTimeline(newTimeline)
-        setVisitedPOIs(new Set())
+        setDeleteConfirmIndex(null)
 
-        // Notify parent component
         if (onTimelineUpdate) {
             onTimelineUpdate(newTimeline)
         }
@@ -69,13 +57,41 @@ function Timeline({ timeline: initialTimeline, totalDuration, totalCost, fitness
         newTimeline.splice(toIndex, 0, movedItem)
         setTimeline(newTimeline)
 
-        // Notify parent component
         if (onTimelineUpdate) {
             onTimelineUpdate(newTimeline)
         }
     }
 
     // SVG Icons
+    const CalendarIcon = () => (
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+        </svg>
+    )
+
+    const DragHandleIcon = () => (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="9" cy="5" r="1.5" />
+            <circle cx="9" cy="12" r="1.5" />
+            <circle cx="9" cy="19" r="1.5" />
+            <circle cx="15" cy="5" r="1.5" />
+            <circle cx="15" cy="12" r="1.5" />
+            <circle cx="15" cy="19" r="1.5" />
+        </svg>
+    )
+
+    const TrashIcon = () => (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            <line x1="10" y1="11" x2="10" y2="17" />
+            <line x1="14" y1="11" x2="14" y2="17" />
+        </svg>
+    )
+
     const ClockIcon = () => (
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="10" />
@@ -121,7 +137,9 @@ function Timeline({ timeline: initialTimeline, totalDuration, totalCost, fitness
     return (
         <div className="timeline">
             <div className="timeline-header">
-                <h2>📅 {t.optimizedItinerary}</h2>
+                <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <CalendarIcon /> {t.optimizedItinerary}
+                </h2>
                 <div className="timeline-stats">
                     <div className="stat-item">
                         <div className="stat-value">{timeline.length}</div>
@@ -136,50 +154,12 @@ function Timeline({ timeline: initialTimeline, totalDuration, totalCost, fitness
                         <div className="stat-label">{t.cost}</div>
                     </div>
                 </div>
-
-                {visitedPOIs.size > 0 && (
-                    <div style={{
-                        marginTop: '1rem',
-                        padding: '1rem',
-                        background: '#fef2f2',
-                        borderRadius: '8px',
-                        border: '2px solid #fca5a5',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center'
-                    }}>
-                        <div>
-                            <strong style={{ color: '#dc2626' }}>✓ {visitedPOIs.size} lugar{visitedPOIs.size > 1 ? 'es' : ''} marcado{visitedPOIs.size > 1 ? 's' : ''}</strong>
-                            <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem', color: '#991b1b' }}>
-                                Se eliminarán del itinerario y el mapa se actualizará
-                            </p>
-                        </div>
-                        <button
-                            onClick={handleRemoveVisited}
-                            style={{
-                                padding: '0.75rem 1.5rem',
-                                background: '#dc2626',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '8px',
-                                cursor: 'pointer',
-                                fontWeight: '600',
-                                fontSize: '0.95rem',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem'
-                            }}
-                        >
-                            🗑️ Eliminar seleccionados
-                        </button>
-                    </div>
-                )}
             </div>
 
             {timeline.map((item, index) => (
                 <div
                     key={index}
-                    className={`timeline-item ${visitedPOIs.has(index) ? 'visited' : ''}`}
+                    className="timeline-item-wrapper"
                     draggable
                     onDragStart={(e) => e.dataTransfer.setData('index', index)}
                     onDragOver={(e) => e.preventDefault()}
@@ -188,98 +168,141 @@ function Timeline({ timeline: initialTimeline, totalDuration, totalCost, fitness
                         const fromIndex = parseInt(e.dataTransfer.getData('index'))
                         handleReorder(fromIndex, index)
                     }}
-                    style={{
-                        opacity: visitedPOIs.has(index) ? 0.6 : 1,
-                        cursor: 'grab',
-                        background: visitedPOIs.has(index) ? '#f3f4f6' : 'white',
-                        border: visitedPOIs.has(index) ? '2px dashed #9ca3af' : '1px solid #e5e7eb',
-                        transition: 'all 0.2s ease'
-                    }}
                 >
+                    {/* Drag Handle */}
+                    <div className="timeline-drag-handle">
+                        <DragHandleIcon />
+                    </div>
+
+                    {/* Timeline Number */}
                     <div className="timeline-number">
-                        <input
-                            type="checkbox"
-                            checked={visitedPOIs.has(index)}
-                            onChange={() => handleMarkVisited(index)}
-                            style={{ marginRight: '0.5rem', cursor: 'pointer' }}
-                        />
                         {index + 1}
                     </div>
 
-                    <div className="timeline-content">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                            <div className="timeline-poi-name">{item.poi_name}</div>
-                            <div style={{ fontSize: '0.9rem' }}>
-                                {renderStars(item.rating || 0)}
-                            </div>
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                            <span className="badge badge-category">{t[item.category] || item.category}</span>
-                            <span className="badge badge-district">{item.district}</span>
-                        </div>
-
-                        <div className="timeline-details">
-                            <div className="timeline-detail">
-                                <ClockIcon />
-                                <span>
-                                    <strong>{t.arrival}:</strong> {item.arrival_time}
-                                </span>
+                    {/* Clickable Card Content */}
+                    <div
+                        className="timeline-item-card"
+                        onClick={() => {
+                            setSelectedPOI(item)
+                            setIsModalOpen(true)
+                        }}
+                    >
+                        <div className="timeline-content">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                                <div className="timeline-poi-name">{item.poi_name}</div>
+                                <div style={{ fontSize: '0.9rem' }}>
+                                    {renderStars(item.rating || 0)}
+                                </div>
                             </div>
 
-                            <div className="timeline-detail">
-                                <ClockIcon />
-                                <span>
-                                    <strong>{t.departure}:</strong> {item.departure_time}
-                                </span>
+                            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                                <span className="badge badge-category">{t[item.category] || item.category}</span>
+                                <span className="badge badge-district">{item.district}</span>
                             </div>
 
-                            <div className="timeline-detail" title="Tiempo que pasarás dentro de este lugar">
-                                <HourglassIcon />
-                                <span>
-                                    <strong>{t.visitTime || "Tiempo en el lugar"}:</strong> {item.visit_duration} min
-                                </span>
-                            </div>
-
-                            {item.travel_time > 0 && (
-                                <div className="timeline-detail" title="Tiempo de viaje desde el lugar anterior">
-                                    {item.transport_mode === 'driving-car' ? <CarIcon /> : <WalkIcon />}
+                            <div className="timeline-details">
+                                <div className="timeline-detail">
+                                    <ClockIcon />
                                     <span>
-                                        <strong>{t.travelTime || "Viaje"}:</strong> {item.travel_time} min
+                                        <strong>{t.arrival}:</strong> {item.arrival_time}
                                     </span>
                                 </div>
-                            )}
 
-                            {item.wait_time > 0 && (
-                                <div className="timeline-detail" title="Tiempo de espera porque el lugar aún no abre">
+                                <div className="timeline-detail">
+                                    <ClockIcon />
+                                    <span>
+                                        <strong>{t.departure}:</strong> {item.departure_time}
+                                    </span>
+                                </div>
+
+                                <div className="timeline-detail" title="Tiempo que pasarás dentro de este lugar">
                                     <HourglassIcon />
                                     <span>
-                                        <strong>{t.waitingTime || "Espera (lugar cerrado)"}:</strong> {item.wait_time} min
+                                        <strong>{t.visitTime || "Tiempo en el lugar"}:</strong> {item.visit_duration} min
                                     </span>
                                 </div>
-                            )}
 
-                            {!item.is_free && (
-                                <div className="timeline-detail">
-                                    <MoneyIcon />
-                                    <span>
-                                        <strong>{t.price}:</strong> {formatCurrency(item.price)}
-                                    </span>
-                                </div>
-                            )}
+                                {item.travel_time > 0 && (
+                                    <div className="timeline-detail" title="Tiempo de viaje desde el lugar anterior">
+                                        {item.transport_mode === 'driving-car' ? <CarIcon /> : <WalkIcon />}
+                                        <span>
+                                            <strong>{t.travelTime || "Viaje"}:</strong> {item.travel_time} min
+                                        </span>
+                                    </div>
+                                )}
 
-                            {item.weather && (
-                                <div className="timeline-detail">
-                                    <span>🌡️</span>
-                                    <span>
-                                        <strong>{t.weather}:</strong> {item.weather.temperature}°C
-                                    </span>
-                                </div>
-                            )}
+                                {item.wait_time > 0 && (
+                                    <div className="timeline-detail" title="Tiempo de espera porque el lugar aún no abre">
+                                        <HourglassIcon />
+                                        <span>
+                                            <strong>{t.waitingTime || "Espera (lugar cerrado)"}:</strong> {item.wait_time} min
+                                        </span>
+                                    </div>
+                                )}
+
+                                {!item.is_free && (
+                                    <div className="timeline-detail">
+                                        <MoneyIcon />
+                                        <span>
+                                            <strong>{t.price}:</strong> {formatCurrency(item.price)}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Delete Button */}
+                    <button
+                        className="timeline-delete-btn"
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            setDeleteConfirmIndex(index)
+                        }}
+                        title="Eliminar del itinerario"
+                    >
+                        <TrashIcon />
+                    </button>
+                </div>
+            ))}
+
+            {/* Delete Confirmation Modal */}
+            {deleteConfirmIndex !== null && (
+                <div className="delete-confirm-overlay" onClick={() => setDeleteConfirmIndex(null)}>
+                    <div className="delete-confirm-modal" onClick={(e) => e.stopPropagation()}>
+                        <h3>¿Eliminar este lugar del itinerario?</h3>
+                        <p className="delete-confirm-poi-name">{timeline[deleteConfirmIndex]?.poi_name}</p>
+                        <p className="delete-confirm-message">
+                            Esta acción eliminará este lugar de tu itinerario optimizado.
+                        </p>
+                        <div className="delete-confirm-actions">
+                            <button
+                                className="btn-cancel"
+                                onClick={() => setDeleteConfirmIndex(null)}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                className="btn-confirm-delete"
+                                onClick={() => handleDeletePOI(deleteConfirmIndex)}
+                            >
+                                Sí, eliminar
+                            </button>
                         </div>
                     </div>
                 </div>
-            ))}
+            )}
+
+            {/* POI Detail Modal */}
+            <POIDetailModal
+                poi={selectedPOI}
+                isOpen={isModalOpen}
+                onClose={() => {
+                    setIsModalOpen(false)
+                    setSelectedPOI(null)
+                }}
+                t={t}
+            />
         </div>
     )
 }
