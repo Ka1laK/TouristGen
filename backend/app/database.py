@@ -4,9 +4,10 @@ from sqlalchemy.orm import sessionmaker
 from app.config import settings
 import os
 
-# Ensure database directory exists
-db_path = settings.database_url.replace("sqlite:///", "")
-os.makedirs(os.path.dirname(db_path), exist_ok=True)
+# Ensure database directory exists only for SQLite
+if "sqlite" in settings.database_url:
+    db_path = settings.database_url.replace("sqlite:///", "")
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
 
 # Create engine
 engine = create_engine(

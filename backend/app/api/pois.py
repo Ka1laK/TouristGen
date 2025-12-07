@@ -1,13 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
 from app.database import get_db
 from app.services.poi_service import POIService
+from app.services.maps_service import LimaPlacesExtractor
 from app.models.poi import POI
+import logging
 
 router = APIRouter()
-
+logger = logging.getLogger(__name__)
 
 # Pydantic models for request/response
 class POIResponse(BaseModel):
@@ -50,6 +52,43 @@ class POICreate(BaseModel):
     image_url: Optional[str] = None
     phone: Optional[str] = None
     website: Optional[str] = None
+
+class SyncRequest(BaseModel):
+    districts: Optional[List[str]] = None
+    force_refresh: bool = False
+
+def run_sync_task(districts: Optional[List[str]]):
+    """Background task to run the extraction"""
+    logger.info("Starting background sync task...")
+    try:
+        extractor = LimaPlacesExtractor()
+        # If no districts provided to task, it uses default list in service
+        result = extractor.extract_and_populate_db(districts=districts)
+        logger.info(f"Background sync complete. Added: {result['added']}, Updated: {result['updated']}")
+    except Exception as e:
+        logger.error(f"Background sync failed: {e}")
+
+
+@router.post("/sync", status_code=202)
+def sync_pois_from_google(
+    request: SyncRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """
+    Trigger a background task to fetch POIs from Google Places API (New).
+    This replaces static JSON loading.
+    
+    - **districts**: List of districts to scan (optional, defaults to all if empty)
+    """
+    # Validation logic could go here
+    
+    background_tasks.add_task(run_sync_task, request.districts)
+    
+    return {
+        "message": "Sync task started in background",
+        "details": f"Targeting {len(request.districts) if request.districts else 'ALL'} districts"
+    }
 
 
 @router.get("/", response_model=List[POIResponse])
@@ -132,7 +171,8 @@ def get_stats(db: Session = Depends(get_db)):
     """Get overview statistics"""
     service = POIService(db)
     
-    total_pois = len(service.get_all_pois())
+    pois_list = service.get_all_pois() # Optimize: Avoid fetching all if just counting
+    total_pois = len(pois_list)
     districts = service.get_districts()
     categories = service.get_categories()
     district_counts = service.get_poi_count_by_district()
