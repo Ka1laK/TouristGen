@@ -30,3 +30,20 @@
 .btn-reset-styled:hover svg {
     transform: rotate(-180deg);
 }
+
+/* Responsive Button Styles */
+@media (max-width: 639px) {
+    .btn-reset-styled {
+        padding: 0.875rem;
+        font-size: 0.95rem;
+        min-height: 44px;
+        /* Adequate touch target */
+    }
+}
+
+@media (max-width: 374px) {
+    .btn-reset-styled {
+        padding: 0.75rem;
+        font-size: 0.9rem;
+    }
+}

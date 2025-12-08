@@ -102,7 +102,19 @@ export const translations = {
         sunday: "Domingo",
         // Map Overlay
         startAdventure: "Comienza tu aventura",
-        enterLocation: "Ingresa tu ubicación o selecciona filtros para ver recomendaciones"
+        enterLocation: "Ingresa tu ubicación o selecciona filtros para ver recomendaciones",
+
+        // POI Detail Modal
+        moreInfo: "Más información",
+        poiDetails: "Detalles del lugar",
+        description: "Descripción",
+        contact: "Contacto",
+        phone: "Teléfono",
+        website: "Sitio web",
+        noInfoAvailable: "No info disponible",
+        contactWhatsApp: "Contactar por WhatsApp",
+        visitWebsite: "Visitar sitio web",
+        close: "Cerrar"
     },
     en: {
         // Header
@@ -207,6 +219,18 @@ export const translations = {
         sunday: "Sunday",
         // Map Overlay
         startAdventure: "Start your adventure",
-        enterLocation: "Enter your location or select filters to see recommendations"
+        enterLocation: "Enter your location or select filters to see recommendations",
+
+        // POI Detail Modal
+        moreInfo: "More information",
+        poiDetails: "Place details",
+        description: "Description",
+        contact: "Contact",
+        phone: "Phone",
+        website: "Website",
+        noInfoAvailable: "No info available",
+        contactWhatsApp: "Contact via WhatsApp",
+        visitWebsite: "Visit website",
+        close: "Close"
     }
 }

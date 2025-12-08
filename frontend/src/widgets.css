@@ -532,6 +532,12 @@
 }
 
 /* Minimalist Recommendation Cards */
+.recommendations-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+}
+
 .recommendation-card-minimal {
     background: white;
     border-radius: 12px;
@@ -614,6 +620,17 @@
     margin-bottom: 1rem;
 }
 
+.recommendations-section {
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+}
+
+.recommendations-actions {
+    margin-top: 1.5rem;
+}
+
 /* Blue Action Button */
 .btn-generate-blue {
     display: flex;
@@ -623,7 +640,6 @@
     width: 100%;
     padding: 1rem;
     background: #2563eb;
-    /* Blue 600 */
     color: white;
     border: none;
     border-radius: 12px;
@@ -637,7 +653,6 @@
 
 .btn-generate-blue:hover:not(:disabled) {
     background: #1d4ed8;
-    /* Blue 700 */
     transform: translateY(-2px);
     box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
 }
@@ -694,4 +709,155 @@
     background: #fee2e2;
     color: #ef4444;
     transform: scale(1.1);
+}
+
+/* ========================================
+   RESPONSIVE DESIGN - WIDGETS
+   ======================================== */
+
+/* Desktop: > 1024px - 4 columns */
+@media (min-width: 1025px) {
+    .weather-time-widget {
+        grid-template-columns: repeat(4, 1fr);
+    }
+
+    .recommendations-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* Tablet: 640px - 1024px - 2 columns */
+@media (min-width: 640px) and (max-width: 1024px) {
+    .weather-time-widget {
+        grid-template-columns: repeat(2, 1fr);
+        padding: 1.25rem;
+    }
+
+    .recommendations-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .recommendations-section {
+        padding: 1.25rem;
+    }
+}
+
+/* Mobile: < 640px - 2×2 grid with minimal content */
+@media (max-width: 639px) {
+
+    /* Weather Widget: 2×2 Grid */
+    .weather-time-widget {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+        padding: 1rem;
+    }
+
+    /* Compact Widget Cards */
+    .widget-card {
+        padding: 1rem;
+        flex-direction: column;
+        text-align: center;
+        gap: 0.5rem;
+    }
+
+    .card-icon {
+        font-size: 2rem;
+    }
+
+    .card-title {
+        font-size: 0.7rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .card-value {
+        font-size: 1.5rem;
+        margin-bottom: 0;
+    }
+
+    /* Hide subtitle on mobile for minimal display */
+    .card-subtitle {
+        display: none;
+    }
+
+    /* Recommendations: 1 column */
+    .recommendations-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .recommendations-section {
+        padding: 1rem;
+    }
+
+    .section-title {
+        font-size: 1.1rem;
+    }
+
+    /* Compact recommendation cards */
+    .recommendation-card-minimal {
+        padding: 0.875rem;
+    }
+
+    .recommendation-card-minimal .card-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 1.25rem;
+    }
+
+    .recommendation-card-minimal h4 {
+        font-size: 0.95rem;
+    }
+
+    .recommendation-card-minimal .card-subtitle {
+        font-size: 0.8rem;
+    }
+
+    .recommendation-card-minimal .meta-item {
+        font-size: 0.75rem;
+    }
+
+    /* Location Search */
+    .search-input-container {
+        flex-direction: column;
+    }
+
+    .btn-location {
+        width: 100%;
+        padding: 0.875rem;
+    }
+
+    /* Form Elements */
+    .form-multiselect {
+        min-height: 100px;
+    }
+
+    /* Buttons */
+    .btn-generate,
+    .btn-generate-blue {
+        padding: 0.875rem;
+        font-size: 0.95rem;
+    }
+}
+
+/* Extra Small Mobile: < 375px */
+@media (max-width: 374px) {
+    .weather-time-widget {
+        padding: 0.75rem;
+        gap: 0.5rem;
+    }
+
+    .widget-card {
+        padding: 0.75rem;
+    }
+
+    .card-icon {
+        font-size: 1.75rem;
+    }
+
+    .card-value {
+        font-size: 1.25rem;
+    }
+
+    .recommendations-section {
+        padding: 0.75rem;
+    }
 }

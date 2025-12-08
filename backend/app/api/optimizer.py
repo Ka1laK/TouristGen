@@ -48,6 +48,14 @@ class TimelineItem(BaseModel):
     latitude: float
     longitude: float
     weather: Optional[Dict] = None
+    # Contact information for POI detail modal
+    phone: Optional[str] = None
+    website: Optional[str] = None
+    address: Optional[str] = None
+    description: Optional[str] = None
+    rating: Optional[float] = None
+    opening_hours: Optional[Dict] = None
+    popularity: Optional[int] = None
 
 
 class OptimizationResponse(BaseModel):
@@ -280,10 +288,26 @@ async def generate_route(
         route_pois = [poi_nodes[idx].id for idx in best_route]
         route_poi_objects = [poi_service.get_poi_by_id(poi_id) for poi_id in route_pois]
         
-        # Enrich timeline with weather
+        # Enrich timeline with weather and contact information
         timeline_items = []
-        for item in route_details["timeline"]:
-            timeline_item = TimelineItem(**item)
+        for i, item in enumerate(route_details["timeline"]):
+            # Get the corresponding POI object for contact info
+            poi_id = item["poi_id"]
+            poi_obj = next((p for p in route_poi_objects if p and p.id == poi_id), None)
+            
+            # Create timeline item with contact fields
+            timeline_data = {
+                **item,
+                "phone": poi_obj.phone if poi_obj else None,
+                "website": poi_obj.website if poi_obj else None,
+                "address": poi_obj.address if poi_obj else None,
+                "description": poi_obj.description if poi_obj else None,
+                "rating": poi_obj.rating if poi_obj else item.get("rating"),
+                "opening_hours": poi_obj.opening_hours if poi_obj else None,
+                "popularity": poi_obj.popularity if poi_obj else None
+            }
+            
+            timeline_item = TimelineItem(**timeline_data)
             
             # Add weather forecast for this time
             arrival_time = _time_str_to_minutes(item["arrival_time"])
