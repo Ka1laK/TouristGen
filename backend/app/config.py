@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     # API Keys (optional)
     openrouteservice_api_key: str = ""
     google_maps_api_key: str = ""
+    gemini_api_key: str = ""  # For chatbot
     openweather_api_key: str = "" # Ya no se usa
     
     # Application

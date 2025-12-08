@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import engine, Base
 from app.api import pois, optimizer, weather, routes, quick_optimizer, geocoding
+from app.chatbot import api as chatbot_api
 import logging
 
 # Configure logging
@@ -42,6 +43,7 @@ app.include_router(quick_optimizer.router, prefix="/api/optimize", tags=["Quick 
 app.include_router(weather.router, prefix="/api/weather", tags=["Weather"])
 app.include_router(routes.router, prefix="/api/routes", tags=["Routes"])
 app.include_router(geocoding.router, prefix="/api/geocoding", tags=["Geocoding"])
+app.include_router(chatbot_api.router, prefix="/api/chat", tags=["Chatbot"])
 
 
 @app.get("/")
