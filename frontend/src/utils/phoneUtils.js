@@ -42,11 +42,12 @@ export function detectPhoneType(phone) {
 export function generateWhatsAppLink(phone, poiName, arrivalTime) {
     if (!phone) return null;
 
-    // Remove all non-numeric characters except +
-    const cleanPhone = phone.replace(/[^\d+]/g, '');
+    // Remove ALL non-numeric characters (including +)
+    const cleanPhone = phone.replace(/\D/g, '');
 
-    // Generate message
-    const message = `Hola, llegaré a ${poiName} a las ${arrivalTime}. Quisiera saber si hay disponibilidad y confirmar mi visita. ¡Gracias!`;
+    // Generate message with conditional time
+    const timeText = arrivalTime ? ` a las ${arrivalTime}` : '';
+    const message = `Hola, estoy interesado en visitar ${poiName}${timeText}. Quisiera saber si hay disponibilidad y confirmar mi visita. ¡Gracias!`;
     const encodedMessage = encodeURIComponent(message);
 
     return `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
