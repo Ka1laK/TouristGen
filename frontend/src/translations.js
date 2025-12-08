@@ -89,6 +89,17 @@ export const translations = {
         Landmark: "Monumentos",
         Zoo: "Zoológicos",
         Cultural: "Centros Culturales",
+        lowBudgetWarning: "Presupuesto bajo, pocos lugares disponibles",
+        durationHelper: "Mínimo 1 hora, máximo 12 horas",
+        // Days of Week
+        dayOfWeek: "Día del tour",
+        monday: "Lunes",
+        tuesday: "Martes",
+        wednesday: "Miércoles",
+        thursday: "Jueves",
+        friday: "Viernes",
+        saturday: "Sábado",
+        sunday: "Domingo",
         // Map Overlay
         startAdventure: "Comienza tu aventura",
         enterLocation: "Ingresa tu ubicación o selecciona filtros para ver recomendaciones"
@@ -183,6 +194,17 @@ export const translations = {
         Landmark: "Landmarks",
         Zoo: "Zoos",
         Cultural: "Cultural Centers",
+        lowBudgetWarning: "Low budget, few places available",
+        durationHelper: "Minimum 1 hour, maximum 12 hours",
+        // Days of Week
+        dayOfWeek: "Day of tour",
+        monday: "Monday",
+        tuesday: "Tuesday",
+        wednesday: "Wednesday",
+        thursday: "Thursday",
+        friday: "Friday",
+        saturday: "Saturday",
+        sunday: "Sunday",
         // Map Overlay
         startAdventure: "Start your adventure",
         enterLocation: "Enter your location or select filters to see recommendations"

@@ -64,11 +64,55 @@ const XIcon = () => (
     </svg>
 )
 
+// Generate time options from 6:00 to 22:30 in 30-minute intervals
+const generateTimeOptions = () => {
+    const options = []
+    for (let hour = 6; hour <= 22; hour++) {
+        for (let minutes = 0; minutes < 60; minutes += 30) {
+            if (hour === 22 && minutes > 30) break
+            const value = `${hour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
+            const hour12 = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour)
+            const ampm = hour >= 12 ? 'PM' : 'AM'
+            const label = `${hour12}:${minutes.toString().padStart(2, '0')} ${ampm}`
+            options.push({ value, label })
+        }
+    }
+    return options
+}
+
+const TIME_OPTIONS = generateTimeOptions()
+
+const CalendarIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+        <line x1="16" y1="2" x2="16" y2="6" />
+        <line x1="8" y1="2" x2="8" y2="6" />
+        <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+)
+
+// Get current day of week
+const getCurrentDayOfWeek = () => {
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+    return days[new Date().getDay()]
+}
+
+const DAYS_OF_WEEK = [
+    { value: 'monday', key: 'monday' },
+    { value: 'tuesday', key: 'tuesday' },
+    { value: 'wednesday', key: 'wednesday' },
+    { value: 'thursday', key: 'thursday' },
+    { value: 'friday', key: 'friday' },
+    { value: 'saturday', key: 'saturday' },
+    { value: 'sunday', key: 'sunday' }
+]
+
 function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onReset, t }) {
     const [preferences, setPreferences] = useState({
         max_duration: 480,
         max_budget: 200,
         start_time: '09:00',
+        day_of_week: getCurrentDayOfWeek(),
         user_pace: 'medium',
         mandatory_categories: [],
         avoid_categories: [],
@@ -217,16 +261,24 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
                     <ClockIcon />
                     <span>{t.duration}</span>
                 </label>
-                <select
-                    className="form-select"
-                    value={preferences.max_duration}
-                    onChange={(e) => handleChange('max_duration', parseInt(e.target.value))}
-                >
-                    <option value="180">3 {t.hours} ({t.halfDay})</option>
-                    <option value="300">5 {t.hours}</option>
-                    <option value="480">8 {t.hours} ({t.fullDay})</option>
-                    <option value="600">10 {t.hours}</option>
-                </select>
+                <div className="input-with-suffix">
+                    <input
+                        type="number"
+                        min="1"
+                        max="12"
+                        step="0.5"
+                        placeholder="8"
+                        value={preferences.max_duration / 60 || ''}
+                        onChange={(e) => {
+                            const hours = e.target.value === '' ? 1 : Math.max(1, Math.min(12, parseFloat(e.target.value) || 1))
+                            handleChange('max_duration', Math.round(hours * 60))
+                        }}
+                    />
+                    <span className="input-suffix">{t.hours}</span>
+                </div>
+                <div className="input-helper">
+                    {t.durationHelper}
+                </div>
             </div>
 
             {/* Budget */}
@@ -235,17 +287,25 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
                     <WalletIcon />
                     <span>{t.budget}</span>
                 </label>
-                <select
-                    className="form-select"
-                    value={preferences.max_budget}
-                    onChange={(e) => handleChange('max_budget', parseFloat(e.target.value))}
-                >
-                    <option value="50">S/ 50 ({t.economic})</option>
-                    <option value="100">S/ 100</option>
-                    <option value="200">S/ 200</option>
-                    <option value="300">S/ 300</option>
-                    <option value="500">S/ 500 ({t.premium})</option>
-                </select>
+                <div className="input-with-prefix">
+                    <span className="input-prefix">S/</span>
+                    <input
+                        type="number"
+                        min="0"
+                        max="10000"
+                        placeholder="200"
+                        value={preferences.max_budget || ''}
+                        onChange={(e) => {
+                            const value = e.target.value === '' ? 0 : Math.max(0, Math.min(10000, parseFloat(e.target.value) || 0))
+                            handleChange('max_budget', value)
+                        }}
+                    />
+                </div>
+                {preferences.max_budget < 20 && (
+                    <div className="input-hint">
+                        ⚠️ {t.lowBudgetWarning}
+                    </div>
+                )}
             </div>
 
             {/* Start Time */}
@@ -254,13 +314,36 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
                     <ClockIcon />
                     <span>{t.startTime}</span>
                 </label>
-                <input
-                    type="time"
-                    className="form-input"
+                <select
+                    className="form-select"
                     value={preferences.start_time}
                     onChange={(e) => handleChange('start_time', e.target.value)}
-                    required
-                />
+                >
+                    {TIME_OPTIONS.map(option => (
+                        <option key={option.value} value={option.value}>
+                            {option.label}
+                        </option>
+                    ))}
+                </select>
+            </div>
+
+            {/* Day of Week */}
+            <div className="form-group-compact">
+                <label className="form-label-icon">
+                    <CalendarIcon />
+                    <span>{t.dayOfWeek}</span>
+                </label>
+                <select
+                    className="form-select"
+                    value={preferences.day_of_week}
+                    onChange={(e) => handleChange('day_of_week', e.target.value)}
+                >
+                    {DAYS_OF_WEEK.map(day => (
+                        <option key={day.value} value={day.value}>
+                            {t[day.key]}
+                        </option>
+                    ))}
+                </select>
             </div>
 
             {/* Transport Mode */}
