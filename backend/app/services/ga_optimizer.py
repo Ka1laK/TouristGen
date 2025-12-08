@@ -27,11 +27,13 @@ class GeneticAlgorithm:
         mutation_rate: float = 0.15,
         crossover_rate: float = 0.8,
         elite_ratio: float = 0.1,
-        tournament_size: int = 5
+        tournament_size: int = 5,
+        start_location: tuple = None  # (latitude, longitude) of starting point
     ):
         self.pois = pois
         self.constraints = constraints
         self.solver = TOPTWSolver(pois, constraints)
+        self.start_location = start_location  # Store for greedy route generation
         
         # GA parameters
         self.population_size = population_size
@@ -46,10 +48,19 @@ class GeneticAlgorithm:
         self.best_solution = None
         self.best_fitness = 0.0
         self.fitness_history = []
+    
+    def set_start_location(self, start_location: tuple):
+        """Set the starting location (latitude, longitude) for route optimization"""
+        self.start_location = start_location
         
     def set_distance_matrix(self, time_matrix: np.ndarray):
         """Set the travel time matrix for the solver"""
         self.solver.set_distance_matrix(time_matrix)
+    
+    def set_start_to_poi_times(self, times: list):
+        """Set travel times from start location to each POI (from OpenRouteService)"""
+        self.solver.set_start_to_poi_times(times)
+
     
     def initialize_population(self):
         """Create initial population with diverse routes"""
@@ -91,9 +102,25 @@ class GeneticAlgorithm:
             current_time = self.constraints.start_time
             total_time = 0
             
-            # Start with a random POI
+            # Start with a POI - prefer closest to start_location if provided
             if available:
-                current_idx = random.choice(list(available))
+                if self.start_location:
+                    try:
+                        from geopy.distance import geodesic
+                        # Sort by distance from start_location, pick closest
+                        sorted_pois = sorted(
+                            available,
+                            key=lambda idx: geodesic(
+                                self.start_location,
+                                (self.pois[idx].latitude, self.pois[idx].longitude)
+                            ).kilometers
+                        )
+                        current_idx = sorted_pois[0]
+                    except:
+                        current_idx = random.choice(list(available))
+                else:
+                    current_idx = random.choice(list(available))
+                
                 route.append(current_idx)
                 available.remove(current_idx)
                 

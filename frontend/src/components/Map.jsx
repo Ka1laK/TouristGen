@@ -132,8 +132,8 @@ function Map({ route, recommendations, step, startLocation, language, t }) {
                     waypoints: waypoints,
                     routeWhileDragging: false,
                     fitSelectedRoutes: true,
-                    language: language, // Set language dynamically
-                    containerClassName: 'routing-instructions', // Custom class for styling
+                    language: language,
+                    containerClassName: 'routing-instructions',
                     lineOptions: {
                         styles: [{ color: '#6366f1', opacity: 0.8, weight: 6 }]
                     },
