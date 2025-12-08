@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import numpy as np
 from datetime import datetime, timedelta
 import logging
-
+from app.services.hours_utils import calculate_urgency_weight
 logger = logging.getLogger(__name__)
 
 
@@ -24,6 +24,8 @@ class POINode:
     tags: List[str]
     district: str
     learned_weight: float = 1.0
+    opening_hours: Dict[str, str]=None
+    phone: str=None
 
 
 @dataclass
@@ -38,7 +40,7 @@ class TOPTWConstraints:
     preferred_districts: List[str]  # Prefer these districts
     weather_conditions: Dict[str, any]  # Current weather data
     transport_mode: str = "driving-car"  # Transport mode for travel time calculations
-
+    day_of_week: str = "Monday" # NUEVO - Día del tour
 
 class TOPTWSolver:
     """
@@ -58,10 +60,14 @@ class TOPTWSolver:
         self.distance_matrix = None  # Will be set externally
         self.time_matrix = None  # Travel time matrix (minutes)
         
-        # Weights for fitness function
-        self.alpha = 0.1  # Travel time penalty weight
-        self.beta = 0.5   # Cost penalty weight
-        self.gamma = 2.0  # Constraint violation penalty weight
+        # Import centralized weights
+        from app.services.optimization_weights import WEIGHTS
+        self.weights = WEIGHTS
+        
+        # Legacy aliases for backward compatibility
+        self.alpha = WEIGHTS.travel_time_penalty
+        self.beta = WEIGHTS.cost_penalty
+        self.gamma = WEIGHTS.constraint_violation
         
     def set_distance_matrix(self, time_matrix: np.ndarray):
         """Set the travel time matrix between POIs (in minutes)"""
@@ -87,11 +93,11 @@ class TOPTWSolver:
         visited_categories = set()
         
         for i, poi_idx in enumerate(route):
+            poi = self.pois[poi_idx]
             if poi_idx >= len(self.pois):
                 penalties += 1000  # Invalid POI index
                 continue
                 
-            poi = self.pois[poi_idx]
             visited_categories.add(poi.category)
             
             # Travel time to this POI
@@ -140,11 +146,25 @@ class TOPTWSolver:
             weather_weight = self._calculate_weather_weight(poi)
             user_weight = self._calculate_user_preference_weight(poi)
             
+            # NUEVO: Calcular peso de urgencia basado en cierre próximo
+            urgency_weight = calculate_urgency_weight(
+                poi.opening_hours if hasattr(poi, 'opening_hours') else {},
+                self.constraints.day_of_week,
+                current_time,
+                poi.visit_duration
+            )
+            
+            # Si urgency_weight es 0, el POI ya no es visitable
+            if urgency_weight == 0:
+                penalties += 300  # Penalización fuerte
+                continue
+            
             poi_score = (
                 poi.popularity * 
                 weather_weight * 
                 user_weight * 
                 poi.learned_weight *
+                urgency_weight *  # NUEVO: peso de urgencia
                 (poi.rating / 5.0)  # Normalize rating to 0-1
             )
             

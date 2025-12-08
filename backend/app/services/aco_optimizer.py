@@ -2,6 +2,7 @@ import random
 import numpy as np
 from typing import List, Tuple, Dict, Optional
 from .toptw_solver import TOPTWSolver, POINode, TOPTWConstraints
+from .hours_utils import calculate_urgency_weight
 import logging
 
 logger = logging.getLogger(__name__)
@@ -52,15 +53,14 @@ class AntColonyOptimizer:
         
     def _calculate_heuristic(self, current_idx: int, next_idx: int, current_time: int) -> float:
         """
-        Calculate heuristic value (eta) for moving from current to next node
-        Combines:
-        - Distance (closer is better)
-        - Popularity (higher is better)
-        - Time Window urgency (closer to closing time is better, if feasible)
+        Calculate heuristic value (eta) for moving from current to next node.
+        Uses centralized weights from optimization_weights.py for consistency with fitness calculation.
         """
+        from app.services.optimization_weights import WEIGHTS
+        
         next_poi = self.pois[next_idx]
         
-        # 1. Distance/Time Heuristic
+        # 1. Distance/Time Heuristic (lower travel time = better)
         travel_time = 0
         if self.solver.time_matrix is not None:
             travel_time = self.solver.time_matrix[current_idx][next_idx]
@@ -73,7 +73,7 @@ class AntColonyOptimizer:
         # 2. Popularity Heuristic
         pop_score = next_poi.popularity / 100.0
         
-        # 3. Time Window Heuristic
+        # 3. Time Window Heuristic (urgency)
         arrival_time = current_time + travel_time
         
         # Check feasibility first
@@ -81,13 +81,19 @@ class AntColonyOptimizer:
             return 0.0
             
         # Urgency: how close are we to closing time?
-        # Higher urgency = higher priority to visit now
         time_left = next_poi.closing_time - arrival_time
         urgency_score = 1.0 / (time_left + 1.0)
         
-        # Combine heuristics
-        # We prioritize popularity and low travel time
-        return (dist_score * 0.4) + (pop_score * 0.4) + (urgency_score * 0.2)
+        # 4. Rating Heuristic (new - for consistency with fitness)
+        rating_score = next_poi.rating / 5.0 if next_poi.rating else 0.5
+        
+        # Combine heuristics using CENTRALIZED WEIGHTS
+        return (
+            (dist_score * WEIGHTS.distance_weight) +
+            (pop_score * WEIGHTS.popularity_weight) +
+            (urgency_score * WEIGHTS.urgency_weight) +
+            (rating_score * WEIGHTS.rating_weight)
+        )
 
     def _select_next_node(self, ant_route: List[int], visited: set, current_time: int) -> Optional[int]:
         """Select the next node for an ant using probabilistic transition rule"""
@@ -99,7 +105,7 @@ class AntColonyOptimizer:
         for next_idx in range(self.num_nodes):
             if next_idx in visited:
                 continue
-                
+            
             # Calculate transition probability
             pheromone = self.pheromone_matrix[current_idx][next_idx] ** self.alpha
             heuristic = self._calculate_heuristic(current_idx, next_idx, current_time) ** self.beta
@@ -123,16 +129,40 @@ class AntColonyOptimizer:
         return np.random.choice(candidates, p=probabilities)
 
     def _construct_solution(self) -> List[int]:
-        """Construct a single ant's solution"""
-        # Start with a random node or based on constraints
-        # For simplicity, pick a random start node that is open
-        start_candidates = [i for i, p in enumerate(self.pois) 
-                           if p.opening_time <= self.constraints.start_time + 60]
+        """
+        Construct a single ant's solution.
+        NUEVO: Prioriza POIs con cierre próximo para visitarlos primero.
+        """
+        current_time = self.constraints.start_time
         
-        if not start_candidates:
-            start_candidates = list(range(self.num_nodes))
-            
-        current_idx = random.choice(start_candidates)
+        # NUEVO: Calcular urgencias para decisión inicial
+        urgencies = []
+        for idx, poi in enumerate(self.pois):
+            urgency = calculate_urgency_weight(
+                poi.opening_hours if hasattr(poi, 'opening_hours') else {},
+                self.constraints.day_of_week,
+                current_time,
+                poi.visit_duration
+            )
+            urgencies.append((idx, urgency))
+        
+        # Ordenar por urgencia descendente (más urgentes primero)
+        urgent_pois = sorted(urgencies, key=lambda x: x[1], reverse=True)
+        
+        # Comenzar con POI más urgente que sea visitable
+        current_idx = None
+        for poi_idx, urgency in urgent_pois:
+            if urgency > 0:  # Es visitable
+                current_idx = poi_idx
+                break
+        
+        # Fallback: si no hay POIs urgentes, elegir aleatorio
+        if current_idx is None:
+            start_candidates = [i for i, p in enumerate(self.pois) 
+                               if p.opening_time <= self.constraints.start_time + 60]
+            if not start_candidates:
+                start_candidates = list(range(self.num_nodes))
+            current_idx = random.choice(start_candidates)
         
         route = [current_idx]
         visited = {current_idx}
