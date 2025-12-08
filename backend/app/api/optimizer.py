@@ -11,6 +11,7 @@ from app.services.poi_service import POIService
 from app.services.weather_service import WeatherService
 from app.services.routes_service import RoutesService
 from app.services.ga_optimizer import GeneticAlgorithm
+from app.services.aco_optimizer import AntColonyOptimizer
 from app.services.toptw_solver import POINode, TOPTWConstraints
 from app.services.maps_service import LimaPlacesExtractor
 from app.config import settings
@@ -18,6 +19,29 @@ from app.models.feedback import Feedback
 from app.services.hours_utils import is_poi_available, calculate_urgency_weight
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def convert_price_level_to_cost(price_level: int) -> float:
+    """
+    Convert Google Places API priceLevel to estimated cost in Peruvian Soles.
+    
+    Google Places API (New) priceLevel values:
+    - PRICE_LEVEL_FREE (0): Free entry/service
+    - PRICE_LEVEL_INEXPENSIVE (1): Budget-friendly (< S/ 30)
+    - PRICE_LEVEL_MODERATE (2): Mid-range (S/ 30-60)
+    - PRICE_LEVEL_EXPENSIVE (3): High-end (S/ 60-100)
+    - PRICE_LEVEL_VERY_EXPENSIVE (4): Premium (> S/ 100)
+    
+    These values represent typical costs for Lima, Peru.
+    """
+    price_mapping = {
+        0: 0.0,    # FREE - museums, parks, public spaces
+        1: 25.0,   # INEXPENSIVE - street food, small cafes, basic attractions
+        2: 50.0,   # MODERATE - restaurants, mid-tier attractions
+        3: 80.0,   # EXPENSIVE - fine dining, premium experiences
+        4: 150.0,  # VERY_EXPENSIVE - luxury restaurants, exclusive venues
+    }
+    return price_mapping.get(price_level, 0.0)
 
 
 # Request/Response models
@@ -224,7 +248,7 @@ async def generate_route(
                 closing_time=closing_time,
                 visit_duration=poi.visit_duration,
                 category=poi.category,
-                price=float(poi.price_level * 10),  # Convert price level to approximate cost
+                price=convert_price_level_to_cost(poi.price_level or 0),  # Realistic price based on Google API levels
                 rating=poi.rating,
                 tags=poi.tags or [],
                 district=poi.district,
@@ -254,41 +278,73 @@ async def generate_route(
             day_of_week=request.day_of_week  # FIXED: Pass day_of_week for opening hours logic
         )
         
-        # Calculate distance matrix
+        # Extract start location for ACO
+        start_loc_tuple = None
+        if request.start_location:
+            start_loc_tuple = (
+                request.start_location.get('latitude'),
+                request.start_location.get('longitude')
+            )
+        
+        # Calculate distance matrix - INCLUDE START LOCATION for accurate first POI travel time
         logger.info(f"Calculating distance matrix for {len(poi_nodes)} POIs using {request.transport_mode}...")
-        coordinates = [(poi.latitude, poi.longitude) for poi in poi_nodes]
-        time_matrix = routes_service.get_distance_matrix(coordinates, profile=request.transport_mode)
         
-        logger.info(f"Calculated distance matrix: {time_matrix.shape}")
+        # Build coordinates list: start location (if provided) + all POIs
+        if start_loc_tuple:
+            all_coordinates = [start_loc_tuple] + [(poi.latitude, poi.longitude) for poi in poi_nodes]
+            time_matrix_with_start = routes_service.get_distance_matrix(all_coordinates, profile=request.transport_mode)
+            
+            # Extract time from start to each POI (row 0, columns 1 to N)
+            start_to_poi_times = time_matrix_with_start[0, 1:].tolist()
+            
+            # Extract POI-to-POI matrix (rows 1 to N, columns 1 to N)
+            time_matrix = time_matrix_with_start[1:, 1:]
+            
+            logger.info(f"Calculated distance matrix with start location: {time_matrix_with_start.shape}")
+            logger.info(f"Start to first 3 POIs times: {start_to_poi_times[:3]} minutes")
+        else:
+            # No start location, just POI-to-POI matrix
+            coordinates = [(poi.latitude, poi.longitude) for poi in poi_nodes]
+            time_matrix = routes_service.get_distance_matrix(coordinates, profile=request.transport_mode)
+            start_to_poi_times = None
+            logger.info(f"Calculated distance matrix (no start location): {time_matrix.shape}")
         
-        # Initialize and run Ant Colony Optimization (ACO)
-        from app.services.aco_optimizer import AntColonyOptimizer
-        
+        # PRIMARY: Ant Colony Optimization (faster and better for routing)
         aco = AntColonyOptimizer(
             pois=poi_nodes,
             constraints=constraints,
-            num_ants=40,       # Increased from 30 for better exploration
-            iterations=80,    # Increased from 50 for better convergence
-            alpha=1.0,        # Pheromone importance
-            beta=2.5          # Heuristic importance (reduced from 3.0 for better balance)
+            num_ants=40,
+            iterations=80,
+            alpha=1.0,
+            beta=2.5,
+            start_location=start_loc_tuple
         )
         
         aco.set_distance_matrix(time_matrix)
         
-        logger.info("Starting Ant Colony Optimization...")
+        # Pass start-to-POI times for accurate first POI travel time calculation
+        if start_to_poi_times:
+            aco.set_start_to_poi_times(start_to_poi_times)
+        
+        logger.info("Starting Ant Colony Optimization (primary)...")
         best_route, best_fitness = aco.solve(verbose=True)
         
         # Store solver reference for later use
         solver = aco.solver
         
-        # Fallback to GA if ACO fails (just in case)
+        # Fallback to GA if ACO fails
         if not best_route:
             logger.warning("ACO failed to find route, falling back to GA")
             ga = GeneticAlgorithm(
                 pois=poi_nodes,
-                constraints=constraints
+                constraints=constraints,
+                population_size=30,
+                generations=40,
+                start_location=start_loc_tuple
             )
             ga.set_distance_matrix(time_matrix)
+            if start_to_poi_times:
+                ga.set_start_to_poi_times(start_to_poi_times)
             best_route, best_fitness = ga.evolve()
             solver = ga.solver
         
@@ -305,11 +361,12 @@ async def generate_route(
                 request.start_location.get('longitude')
             )
         
-        # Get route details with start location
+        # Get route details with start location and accurate travel times
         route_details = solver.get_route_details(best_route, start_location=start_loc_coords)
         
         # Generate route ID
         route_id = f"route_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
         
         # Build response
         route_pois = [poi_nodes[idx].id for idx in best_route]
@@ -343,21 +400,23 @@ async def generate_route(
             
             timeline_items.append(timeline_item)
         
-        # Get route geometry (streets and avenues)
+        # CRITICAL FIX: Build route array from timeline_items to ensure perfect sync
+        # This ensures Map (uses route) and Timeline (uses timeline) show the same POIs
+        # Previously, route used full best_route while timeline filtered out excessive-wait POIs
+        route_from_timeline = []
+        for item in timeline_items:
+            poi_obj = next((p for p in route_poi_objects if p and p.id == item.poi_id), None)
+            if poi_obj:
+                route_from_timeline.append(poi_obj.to_dict())
+
+        # Get route geometry (streets and avenues) - USING SYNCED ROUTE
         route_geometry = []
-        if len(route_poi_objects) > 1:
+        if len(route_from_timeline) > 1:
             try:
-                # Extract coordinates from ordered POIs
-                route_coords = [(poi.latitude, poi.longitude) for poi in route_poi_objects]
+                # Extract coordinates from synced POIs (matches timeline)
+                route_coords = [(poi["latitude"], poi["longitude"]) for poi in route_from_timeline]
                 
                 # Get detailed geometry from OpenRouteService
-                # This returns segments with coordinates for drawing on map
-                # We need to process this similar to quick_optimizer
-                
-                # For now, we'll use a simplified approach: get geometry between each pair
-                # Ideally, we would ask for the full route at once
-                
-                # Let's use the helper from quick_optimizer if available, or implement here
                 from app.api.quick_optimizer import get_route_geometry
                 route_geometry = get_route_geometry(route_coords)
                 
@@ -367,19 +426,20 @@ async def generate_route(
 
         response = OptimizationResponse(
             route_id=route_id,
-            route=[poi.to_dict() for poi in route_poi_objects if poi],
+            route=route_from_timeline,  # Now synced with timeline
             timeline=timeline_items,
             total_duration=int(round(route_details["total_duration"])),
             total_cost=route_details["total_cost"],
             fitness_score=best_fitness,
             start_time=route_details["start_time"],
             end_time=route_details["end_time"],
-            num_pois=route_details["num_pois"],
+            num_pois=len(route_from_timeline),  # Use synced count
             weather_summary=weather_data,
-            route_geometry=route_geometry
+            route_geometry=route_geometry  # Now using synced coordinates
         )
         
         return response
+
         
     except HTTPException:
         raise

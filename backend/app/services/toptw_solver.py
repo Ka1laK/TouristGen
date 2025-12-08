@@ -54,11 +54,15 @@ class TOPTWSolver:
     - User preferences
     """
     
+    # Maximum wait time allowed (in minutes) before a POI opens
+    MAX_WAIT_TIME = 30
+    
     def __init__(self, pois: List[POINode], constraints: TOPTWConstraints):
         self.pois = pois
         self.constraints = constraints
         self.distance_matrix = None  # Will be set externally
         self.time_matrix = None  # Travel time matrix (minutes)
+        self.start_to_poi_times = None  # Travel times from start location to each POI (from ORS API)
         
         # Import centralized weights
         from app.services.optimization_weights import WEIGHTS
@@ -72,6 +76,11 @@ class TOPTWSolver:
     def set_distance_matrix(self, time_matrix: np.ndarray):
         """Set the travel time matrix between POIs (in minutes)"""
         self.time_matrix = time_matrix
+    
+    def set_start_to_poi_times(self, times: List[float]):
+        """Set travel times from start location to each POI (from OpenRouteService API)"""
+        self.start_to_poi_times = times
+
         
     def calculate_fitness(self, route: List[int]) -> float:
         """
@@ -123,7 +132,13 @@ class TOPTWSolver:
             if current_time < poi.opening_time:
                 # Arrived too early - must wait
                 wait_time = poi.opening_time - current_time
-                penalties += wait_time * 0.5  # Waiting penalty
+                
+                # Skip POIs that require excessive waiting
+                if wait_time > self.MAX_WAIT_TIME:
+                    penalties += 500  # Heavy penalty for excessive wait
+                    continue  # Skip this POI - not worth waiting
+                
+                penalties += wait_time * 2.0  # Stronger waiting penalty
                 current_time = poi.opening_time
                 total_time += wait_time
             
@@ -402,16 +417,22 @@ class TOPTWSolver:
             # Travel time
             travel_time = 0
             if i == 0 and start_location:
-                # Calculate travel from start location to first POI
-                from geopy.distance import geodesic
-                dist_km = geodesic(start_location, (poi.latitude, poi.longitude)).kilometers
-                speeds = {
-                    "foot-walking": 4.5,
-                    "cycling-regular": 15.0,
-                    "driving-car": 25.0
-                }
-                speed = speeds.get(self.constraints.transport_mode, 25.0)
-                travel_time = (dist_km / speed) * 60  # Convert to minutes
+                # Use ORS API travel time if available (set via set_start_to_poi_times)
+                if self.start_to_poi_times is not None and poi_idx < len(self.start_to_poi_times):
+                    travel_time = self.start_to_poi_times[poi_idx]
+                    logger.info(f"Using ORS travel time to first POI '{poi.name}': {travel_time:.1f} min")
+                else:
+                    # Fallback: Calculate travel from start location to first POI using geodesic
+                    from geopy.distance import geodesic
+                    dist_km = geodesic(start_location, (poi.latitude, poi.longitude)).kilometers
+                    speeds = {
+                        "foot-walking": 4.5,
+                        "cycling-regular": 15.0,
+                        "driving-car": 25.0
+                    }
+                    speed = speeds.get(self.constraints.transport_mode, 25.0)
+                    travel_time = (dist_km / speed) * 60  # Convert to minutes
+                    logger.warning(f"Using fallback geodesic travel time to first POI: {travel_time:.1f} min")
                 current_time += travel_time
             elif i > 0:
                 prev_idx = route[i-1]
@@ -427,6 +448,11 @@ class TOPTWSolver:
             wait_time = 0
             if current_time < poi.opening_time:
                 wait_time = poi.opening_time - current_time
+                
+                # Skip POIs that require excessive waiting
+                if wait_time > self.MAX_WAIT_TIME:
+                    continue  # Don't include in timeline
+                
                 current_time = poi.opening_time
             
             # Use smart visit duration
@@ -447,7 +473,8 @@ class TOPTWSolver:
                 "departure_time": self._minutes_to_time_string(departure_time),
                 "visit_duration": smart_visit_duration,
                 "travel_time": int(travel_time),
-                "wait_time": int(wait_time) if wait_time > 0 else 0,  # Convert to int
+                "wait_time": int(wait_time) if wait_time > 0 else 0,
+                "wait_warning": wait_time > 15,  # Flag if wait > 15 min
                 "price": poi.price,
                 "latitude": poi.latitude,
                 "longitude": poi.longitude,

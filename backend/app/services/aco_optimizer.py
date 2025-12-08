@@ -26,11 +26,13 @@ class AntColonyOptimizer:
         alpha: float = 1.0,  # Pheromone importance
         beta: float = 2.5,   # Heuristic importance
         evaporation_rate: float = 0.1,
-        q: float = 100.0     # Pheromone deposit factor
+        q: float = 100.0,    # Pheromone deposit factor
+        start_location: tuple = None  # (latitude, longitude) of starting point
     ):
         self.pois = pois
         self.constraints = constraints
         self.solver = TOPTWSolver(pois, constraints)
+        self.start_location = start_location  # Store start location for route optimization
         
         # ACO parameters
         self.num_ants = num_ants
@@ -46,54 +48,105 @@ class AntColonyOptimizer:
         self.best_solution = []
         self.best_fitness = 0.0
         self.fitness_history = []
+    
+    def set_start_location(self, start_location: tuple):
+        """Set the starting location (latitude, longitude) for route optimization"""
+        self.start_location = start_location
         
     def set_distance_matrix(self, time_matrix: np.ndarray):
         """Set the travel time matrix for the solver"""
         self.solver.set_distance_matrix(time_matrix)
+    
+    def set_start_to_poi_times(self, times: List[float]):
+        """Set travel times from start location to each POI (from OpenRouteService)"""
+        self.start_to_poi_times = times
+        self.solver.set_start_to_poi_times(times)
         
+    # Maximum wait time allowed (in minutes) before a POI opens
+    MAX_WAIT_TIME = 30
+
+    
     def _calculate_heuristic(self, current_idx: int, next_idx: int, current_time: int) -> float:
         """
         Calculate heuristic value (eta) for moving from current to next node.
         Uses centralized weights from optimization_weights.py for consistency with fitness calculation.
+        
+        IMPORTANT: All scores are normalized to 0.0-1.0 scale so weights work as intended.
         """
         from app.services.optimization_weights import WEIGHTS
+        from app.services.hours_utils import parse_opening_hours
         
         next_poi = self.pois[next_idx]
         
-        # 1. Distance/Time Heuristic (lower travel time = better)
+        # 1. Distance/Time Heuristic (NORMALIZED: 0-1 scale)
+        # 0 min travel = 1.0, 60+ min travel = 0.0
         travel_time = 0
         if self.solver.time_matrix is not None:
             travel_time = self.solver.time_matrix[current_idx][next_idx]
         else:
             travel_time = self.solver._estimate_travel_time(self.pois[current_idx], next_poi)
-            
-        # Avoid division by zero
-        dist_score = 1.0 / (travel_time + 1.0)
         
-        # 2. Popularity Heuristic
-        pop_score = next_poi.popularity / 100.0
+        # Normalize: closer = higher score (linear decay over 60 min)
+        dist_score = max(0.0, 1.0 - (travel_time / 60.0))
         
-        # 3. Time Window Heuristic (urgency)
+        # 2. Popularity Heuristic (already 0-1: pop/100)
+        pop_score = min(1.0, next_poi.popularity / 100.0)
+        
+        # 3. Time Window Heuristic - CHECK BOTH OPENING AND CLOSING TIME
         arrival_time = current_time + travel_time
         
-        # Check feasibility first
-        if arrival_time >= next_poi.closing_time:
-            return 0.0
-            
-        # Urgency: how close are we to closing time?
-        time_left = next_poi.closing_time - arrival_time
-        urgency_score = 1.0 / (time_left + 1.0)
+        # Get actual opening hours for the day
+        opening_time = next_poi.opening_time
+        closing_time = next_poi.closing_time
         
-        # 4. Rating Heuristic (new - for consistency with fitness)
-        rating_score = next_poi.rating / 5.0 if next_poi.rating else 0.5
+        # If we have detailed opening_hours, parse them
+        if hasattr(next_poi, 'opening_hours') and next_poi.opening_hours:
+            parsed_open, parsed_close = parse_opening_hours(
+                next_poi.opening_hours, 
+                self.constraints.day_of_week
+            )
+            if parsed_open is not None:
+                opening_time = parsed_open
+                closing_time = parsed_close
+        
+        # Check if POI is closed this day
+        if opening_time is None:
+            return 0.0  # Closed today - infeasible
+        
+        # Check if we arrive after closing
+        if arrival_time >= closing_time:
+            return 0.0  # Can't visit - too late
+        
+        # FIX: Check if POI hasn't opened yet and calculate wait time
+        wait_time = 0
+        if arrival_time < opening_time:
+            wait_time = opening_time - arrival_time
+            # EXCLUDE POIs that require excessive waiting
+            if wait_time > self.MAX_WAIT_TIME:
+                return 0.0  # Too much waiting - not worth it
+        
+        # Urgency: normalize based on how much time left (0-1 scale)
+        # Less than 60 min left = high urgency (1.0), more than 300 min = low urgency (0.0)
+        effective_arrival = max(arrival_time, opening_time)  # Account for wait time
+        time_left = closing_time - effective_arrival
+        urgency_score = max(0.0, min(1.0, 1.0 - (time_left / 300.0)))
+        
+        # 4. Rating Heuristic (already 0-1: rating/5)
+        rating_score = (next_poi.rating / 5.0) if next_poi.rating else 0.5
+        
+        # 5. Wait time penalty (reduce score if we have to wait)
+        wait_penalty = 1.0 - (wait_time / self.MAX_WAIT_TIME) if wait_time > 0 else 1.0
         
         # Combine heuristics using CENTRALIZED WEIGHTS
-        return (
+        # Now all scores are 0-1, so weights work as intended!
+        total = (
             (dist_score * WEIGHTS.distance_weight) +
             (pop_score * WEIGHTS.popularity_weight) +
             (urgency_score * WEIGHTS.urgency_weight) +
             (rating_score * WEIGHTS.rating_weight)
-        )
+        ) * wait_penalty  # Apply wait penalty to total score
+        
+        return total
 
     def _select_next_node(self, ant_route: List[int], visited: set, current_time: int) -> Optional[int]:
         """Select the next node for an ant using probabilistic transition rule"""
@@ -131,38 +184,72 @@ class AntColonyOptimizer:
     def _construct_solution(self) -> List[int]:
         """
         Construct a single ant's solution.
-        NUEVO: Prioriza POIs con cierre próximo para visitarlos primero.
+        Considers start_location for first POI selection (distance + urgency).
         """
+        from geopy.distance import geodesic
+        
         current_time = self.constraints.start_time
         
-        # NUEVO: Calcular urgencias para decisión inicial
-        urgencies = []
+        # Calculate combined score for first POI: urgency + proximity to start
+        poi_scores = []
         for idx, poi in enumerate(self.pois):
+            # 1. Urgency weight
             urgency = calculate_urgency_weight(
                 poi.opening_hours if hasattr(poi, 'opening_hours') else {},
                 self.constraints.day_of_week,
                 current_time,
                 poi.visit_duration
             )
-            urgencies.append((idx, urgency))
+            
+            # 2. Distance from start_location (if provided)
+            distance_score = 1.0
+            if self.start_location and urgency > 0:
+                try:
+                    dist_km = geodesic(
+                        self.start_location, 
+                        (poi.latitude, poi.longitude)
+                    ).kilometers
+                    # Inverse distance: closer = higher score (max 1.0, min ~0.1)
+                    distance_score = 1.0 / (1.0 + dist_km * 0.2)
+                except:
+                    distance_score = 0.5  # Default if geodesic fails
+            
+            # Combined score: urgency * distance proximity
+            # This balances "needs to visit soon" with "is nearby"
+            combined_score = urgency * distance_score
+            poi_scores.append((idx, combined_score, urgency))
         
-        # Ordenar por urgencia descendente (más urgentes primero)
-        urgent_pois = sorted(urgencies, key=lambda x: x[1], reverse=True)
+        # Sort by combined score (best first)
+        poi_scores.sort(key=lambda x: x[1], reverse=True)
         
-        # Comenzar con POI más urgente que sea visitable
+        # Select first POI with positive urgency
         current_idx = None
-        for poi_idx, urgency in urgent_pois:
-            if urgency > 0:  # Es visitable
+        for poi_idx, combined, urgency in poi_scores:
+            if urgency > 0:  # Must be visitable
                 current_idx = poi_idx
                 break
         
-        # Fallback: si no hay POIs urgentes, elegir aleatorio
+        # Fallback: if no POIs are urgently visitable, select by distance only
         if current_idx is None:
             start_candidates = [i for i, p in enumerate(self.pois) 
                                if p.opening_time <= self.constraints.start_time + 60]
             if not start_candidates:
                 start_candidates = list(range(self.num_nodes))
-            current_idx = random.choice(start_candidates)
+            
+            # If we have start_location, sort by distance
+            if self.start_location and start_candidates:
+                try:
+                    start_candidates.sort(
+                        key=lambda idx: geodesic(
+                            self.start_location,
+                            (self.pois[idx].latitude, self.pois[idx].longitude)
+                        ).kilometers
+                    )
+                    current_idx = start_candidates[0]  # Closest POI
+                except:
+                    current_idx = random.choice(start_candidates)
+            else:
+                current_idx = random.choice(start_candidates)
         
         route = [current_idx]
         visited = {current_idx}
@@ -184,7 +271,25 @@ class AntColonyOptimizer:
                 
             next_poi = self.pois[next_idx]
             arrival = current_time + travel_time
-            departure = max(arrival, next_poi.opening_time) + next_poi.visit_duration
+            
+            # FIX: Get actual opening time for the day
+            opening_time = next_poi.opening_time
+            if hasattr(next_poi, 'opening_hours') and next_poi.opening_hours:
+                from app.services.hours_utils import parse_opening_hours
+                parsed_open, _ = parse_opening_hours(
+                    next_poi.opening_hours, 
+                    self.constraints.day_of_week
+                )
+                if parsed_open is not None:
+                    opening_time = parsed_open
+            
+            # FIX: Check wait time - skip if too long
+            if arrival < opening_time:
+                wait_time = opening_time - arrival
+                if wait_time > self.MAX_WAIT_TIME:
+                    continue  # Skip this POI - too much waiting
+            
+            departure = max(arrival, opening_time) + next_poi.visit_duration
             
             if departure - self.constraints.start_time > self.constraints.max_duration:
                 break
