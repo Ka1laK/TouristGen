@@ -260,6 +260,109 @@
     margin-top: 0.25rem;
 }
 
+/* Input with Prefix (Budget) */
+.input-with-prefix {
+    display: flex;
+    align-items: center;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.2s;
+}
+
+.input-with-prefix:focus-within {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.input-prefix {
+    background: #f1f5f9;
+    color: #64748b;
+    padding: 0.75rem 0.75rem;
+    font-weight: 500;
+    font-size: 0.95rem;
+    border-right: 1px solid var(--border);
+}
+
+.input-with-prefix input {
+    border: none;
+    flex: 1;
+    padding: 0.75rem;
+    font-size: 0.95rem;
+    outline: none;
+    min-width: 0;
+}
+
+.input-with-prefix input::-webkit-outer-spin-button,
+.input-with-prefix input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.input-with-prefix input[type=number] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.input-hint {
+    color: #f59e0b;
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+/* Input with Suffix (Duration) */
+.input-with-suffix {
+    display: flex;
+    align-items: center;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.2s;
+}
+
+.input-with-suffix:focus-within {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.input-with-suffix input {
+    border: none;
+    flex: 1;
+    padding: 0.75rem;
+    font-size: 0.95rem;
+    outline: none;
+    min-width: 0;
+}
+
+.input-with-suffix input::-webkit-outer-spin-button,
+.input-with-suffix input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.input-with-suffix input[type=number] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.input-suffix {
+    background: #f1f5f9;
+    color: #64748b;
+    padding: 0.75rem 0.75rem;
+    font-weight: 500;
+    font-size: 0.95rem;
+    border-left: 1px solid var(--border);
+}
+
+.input-helper {
+    color: #94a3b8;
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+}
+
 .btn-advanced {
     display: flex;
     align-items: center;
