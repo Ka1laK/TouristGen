@@ -15,7 +15,7 @@ from app.services.toptw_solver import POINode, TOPTWConstraints
 from app.services.maps_service import LimaPlacesExtractor
 from app.config import settings
 from app.models.feedback import Feedback
-
+from app.services.hours_utils import is_poi_available, calculate_urgency_weight
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ class OptimizationRequest(BaseModel):
     start_location: Optional[Dict[str, float]] = Field(None, description="Starting location {lat, lon}")
     selected_poi_ids: Optional[List[int]] = Field(None, description="Pre-selected POI IDs to optimize")
     transport_mode: str = Field("driving-car", description="Transport mode", pattern="^(driving-car|foot-walking)$")
-
+    day_of_week: str = Field("Monday", description="Day of week", pattern="^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)$")
 
 class TimelineItem(BaseModel):
     poi_id: int
@@ -169,7 +169,31 @@ async def generate_route(
             # Sort by popularity and take top 15
             pois = sorted(pois, key=lambda x: x.popularity, reverse=True)[:20]
         
-        logger.info(f"Found {len(pois)} POIs for optimization")
+        logger.info(f"Found {len(pois)} POIs before availability filter")
+        
+        # NUEVO: Filtrar POIs que NO estarán disponibles según opening_hours
+        start_time_minutes = _time_str_to_minutes(request.start_time)
+        available_pois = []
+        for poi in pois:
+            if is_poi_available(
+                poi.opening_hours,
+                request.day_of_week,
+                start_time_minutes,
+                poi.visit_duration
+            ):
+                available_pois.append(poi)
+            else:
+                logger.info(f"Filtered out POI '{poi.name}' - closed on {request.day_of_week} at {request.start_time}")
+        
+        pois = available_pois
+        
+        if not pois:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No hay lugares disponibles para {request.day_of_week} a las {request.start_time}"
+            )
+        
+        logger.info(f"Found {len(pois)} POIs for optimization after availability filter")
         
         # Convert to POINode objects
         poi_nodes = []
@@ -204,7 +228,9 @@ async def generate_route(
                 rating=poi.rating,
                 tags=poi.tags or [],
                 district=poi.district,
-                learned_weight=poi.learned_popularity
+                learned_weight=poi.learned_popularity,
+                opening_hours=poi.opening_hours,
+                phone=poi.phone
             )
             poi_nodes.append(poi_node)
         
@@ -224,7 +250,8 @@ async def generate_route(
             avoid_categories=request.avoid_categories,
             preferred_districts=request.preferred_districts,
             weather_conditions=weather_data or {},
-            transport_mode=request.transport_mode
+            transport_mode=request.transport_mode,
+            day_of_week=request.day_of_week  # FIXED: Pass day_of_week for opening hours logic
         )
         
         # Calculate distance matrix
@@ -240,10 +267,10 @@ async def generate_route(
         aco = AntColonyOptimizer(
             pois=poi_nodes,
             constraints=constraints,
-            num_ants=30,
-            iterations=50, # Fast convergence
-            alpha=1.0,
-            beta=3.0 # Prioritize heuristics (distance/popularity)
+            num_ants=40,       # Increased from 30 for better exploration
+            iterations=80,    # Increased from 50 for better convergence
+            alpha=1.0,        # Pheromone importance
+            beta=2.5          # Heuristic importance (reduced from 3.0 for better balance)
         )
         
         aco.set_distance_matrix(time_matrix)
