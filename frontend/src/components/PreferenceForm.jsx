@@ -93,18 +93,18 @@ const CalendarIcon = () => (
 
 // Get current day of week
 const getCurrentDayOfWeek = () => {
-    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
     return days[new Date().getDay()]
 }
 
 const DAYS_OF_WEEK = [
-    { value: 'monday', key: 'monday' },
-    { value: 'tuesday', key: 'tuesday' },
-    { value: 'wednesday', key: 'wednesday' },
-    { value: 'thursday', key: 'thursday' },
-    { value: 'friday', key: 'friday' },
-    { value: 'saturday', key: 'saturday' },
-    { value: 'sunday', key: 'sunday' }
+    { value: 'Monday', key: 'monday' },
+    { value: 'Tuesday', key: 'tuesday' },
+    { value: 'Wednesday', key: 'wednesday' },
+    { value: 'Thursday', key: 'thursday' },
+    { value: 'Friday', key: 'friday' },
+    { value: 'Saturday', key: 'saturday' },
+    { value: 'Sunday', key: 'sunday' }
 ]
 
 function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onReset, t }) {
