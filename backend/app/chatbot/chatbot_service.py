@@ -30,7 +30,7 @@ class ChatbotService:
     Service that manages chatbot conversations and parameter extraction
     """
     
-    REQUIRED_PARAMS = ["max_duration", "max_budget", "start_time", "day_of_week", "preferred_districts"]
+    REQUIRED_PARAMS = ["max_duration", "max_budget", "start_time", "day_of_week", "preferred_districts", "start_location_text"]
     
     def __init__(self, gemini_api_key: Optional[str] = None):
         self.gemini = GeminiService(api_key=gemini_api_key)
@@ -162,6 +162,8 @@ class ChatbotService:
             missing.append("day_of_week")
         if not params.preferred_districts:
             missing.append("preferred_districts")
+        if not params.start_location_text:
+            missing.append("start_location_text")
             
         return missing
     
@@ -261,7 +263,7 @@ class ChatbotService:
             "avoid_categories": params.avoid_categories,
             "preferred_districts": params.preferred_districts,
             "transport_mode": params.transport_mode or "driving-car",
-            "start_location": None  # Start location geocoding not implemented
+            "start_location_text": params.start_location_text  # Will be geocoded by API
         }
     
     def get_session_summary(self, session_id: str) -> Optional[Dict[str, Any]]:

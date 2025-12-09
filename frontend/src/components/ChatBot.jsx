@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import '../chatbot.css'
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
 /**
  * Floating Chatbot Widget Component
  * 
@@ -69,7 +71,7 @@ function ChatBot({ t, language, onRouteGenerated }) {
         setIsLoading(true)
 
         try {
-            const response = await fetch('http://localhost:8000/api/chat/message', {
+            const response = await fetch(`${API_URL}/api/chat/message`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -121,7 +123,7 @@ function ChatBot({ t, language, onRouteGenerated }) {
         console.log('[ChatBot] Generating route with session_id:', sessionId)
 
         try {
-            const response = await fetch('http://localhost:8000/api/chat/generate-route', {
+            const response = await fetch(`${API_URL}/api/chat/generate-route`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ session_id: sessionId }),

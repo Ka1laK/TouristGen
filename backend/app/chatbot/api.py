@@ -148,6 +148,27 @@ async def generate_route_from_chat(
     if request.start_location:
         params["start_location"] = request.start_location
     
+    # Geocode start_location_text if provided but no direct start_location
+    if not params.get("start_location") and params.get("start_location_text"):
+        from app.api.geocoding import geocode_location
+        try:
+            start_text = params["start_location_text"]
+            logger.info(f"Geocoding start location: {start_text}")
+            geocode_result = await geocode_location(start_text)
+            if geocode_result and len(geocode_result) > 0:
+                params["start_location"] = {
+                    "latitude": float(geocode_result[0]["lat"]),
+                    "longitude": float(geocode_result[0]["lon"])
+                }
+                logger.info(f"Geocoded '{start_text}' to {params['start_location']}")
+            else:
+                logger.warning(f"Could not geocode: {start_text}")
+        except Exception as e:
+            logger.warning(f"Geocoding failed for '{params['start_location_text']}': {e}")
+    
+    # Remove start_location_text since the optimizer expects start_location dict
+    params.pop("start_location_text", None)
+    
     # Import and call the optimization endpoint
     from app.api.optimizer import generate_route, OptimizationRequest
     from fastapi import BackgroundTasks
