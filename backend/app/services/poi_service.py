@@ -1,7 +1,6 @@
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict
 from app.models.poi import POI
-from app.models.feedback import Feedback
 import logging
 
 logger = logging.getLogger(__name__)
@@ -114,54 +113,6 @@ class POIService:
         poi.is_active = False
         self.db.commit()
         return True
-    
-    def update_learned_weights(self):
-        """
-        Update learned popularity weights based on user feedback
-        
-        This implements the learning mechanism:
-        - POIs with high ratings get boosted
-        - POIs that are frequently skipped get reduced
-        """
-        pois = self.get_all_pois()
-        
-        for poi in pois:
-            # Get feedback for this POI
-            feedbacks = self.db.query(Feedback).filter(
-                Feedback.poi_id == poi.id
-            ).all()
-            
-            if not feedbacks:
-                continue
-            
-            # Calculate average rating
-            ratings = [f.rating for f in feedbacks if f.rating is not None]
-            if ratings:
-                avg_rating = sum(ratings) / len(ratings)
-                
-                # Adjust learned weight based on rating
-                # Rating 5 -> weight 1.3
-                # Rating 3 -> weight 1.0
-                # Rating 1 -> weight 0.7
-                poi.learned_popularity = 0.7 + (avg_rating / 5.0) * 0.6
-            
-            # Check visit rate
-            total_feedback = len(feedbacks)
-            visited = sum(1 for f in feedbacks if f.visited == 1)
-            
-            if total_feedback > 0:
-                visit_rate = visited / total_feedback
-                
-                # Adjust weight based on visit rate
-                # High visit rate -> boost
-                # Low visit rate -> reduce
-                if visit_rate > 0.8:
-                    poi.learned_popularity *= 1.2
-                elif visit_rate < 0.3:
-                    poi.learned_popularity *= 0.8
-        
-        self.db.commit()
-        logger.info("Updated learned weights for all POIs")
     
     def get_popular_pois(self, limit: int = 10) -> List[POI]:
         """Get most popular POIs"""

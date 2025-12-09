@@ -10,12 +10,10 @@ from app.database import get_db
 from app.services.poi_service import POIService
 from app.services.weather_service import WeatherService
 from app.services.routes_service import RoutesService
-from app.services.ga_optimizer import GeneticAlgorithm
 from app.services.aco_optimizer import AntColonyOptimizer
 from app.services.toptw_solver import POINode, TOPTWConstraints
 from app.services.maps_service import LimaPlacesExtractor
 from app.config import settings
-from app.models.feedback import Feedback
 from app.services.hours_utils import is_poi_available, calculate_urgency_weight
 router = APIRouter()
 logger = logging.getLogger(__name__)
