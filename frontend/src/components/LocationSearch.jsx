@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
 function LocationSearch({ onLocationSelect, initialValue = '' }) {
     const [searchTerm, setSearchTerm] = useState(initialValue)
     const [suggestions, setSuggestions] = useState([])
@@ -34,7 +36,7 @@ function LocationSearch({ onLocationSelect, initialValue = '' }) {
         try {
             // Use backend proxy to avoid CORS issues
             const response = await fetch(
-                `http://localhost:8000/api/geocoding/search?q=${encodeURIComponent(query)}&limit=5`
+                `${API_URL}/api/geocoding/search?q=${encodeURIComponent(query)}&limit=5`
             )
 
             if (!response.ok) {
@@ -77,7 +79,7 @@ function LocationSearch({ onLocationSelect, initialValue = '' }) {
                     // Reverse geocode to get address using backend proxy
                     try {
                         const response = await fetch(
-                            `http://localhost:8000/api/geocoding/reverse?lat=${latitude}&lon=${longitude}`
+                            `${API_URL}/api/geocoding/reverse?lat=${latitude}&lon=${longitude}`
                         )
 
                         if (!response.ok) {

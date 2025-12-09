@@ -27,6 +27,60 @@ def rate_limit():
     last_request_time = time.time()
 
 
+async def geocode_location(query: str, limit: int = 3) -> List[Dict]:
+    """
+    Geocode a location string to coordinates.
+    
+    This is a helper function that can be called from other modules.
+    Unlike the endpoint, this doesn't raise HTTPException on errors.
+    
+    Args:
+        query: Location text to geocode
+        limit: Maximum results to return
+        
+    Returns:
+        List of dicts with lat, lon, display_name keys
+    """
+    try:
+        rate_limit()
+        
+        # Add Lima, Peru context to improve results
+        search_query = f"{query}, Lima, Peru"
+        
+        response = requests.get(
+            "https://nominatim.openstreetmap.org/search",
+            params={
+                "q": search_query,
+                "format": "json",
+                "limit": limit,
+                "addressdetails": 1
+            },
+            headers={
+                "User-Agent": "TouristGen/1.0 (Educational Project)"
+            },
+            timeout=10
+        )
+        
+        response.raise_for_status()
+        data = response.json()
+        
+        results = []
+        for item in data:
+            results.append({
+                "display_name": item.get("display_name", ""),
+                "lat": float(item.get("lat", 0)),
+                "lon": float(item.get("lon", 0)),
+                "address": item.get("address", {})
+            })
+        
+        logger.info(f"Geocoded '{query}' -> {len(results)} results")
+        return results
+        
+    except Exception as e:
+        logger.error(f"Geocoding error for '{query}': {e}")
+        return []
+
+
 @router.get("/search")
 def search_location(
     q: str = Query(..., description="Search query"),
