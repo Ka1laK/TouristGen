@@ -93,10 +93,14 @@ async def generate_route_from_chat(
     
     This endpoint:
     1. Gets the extracted parameters from the chat session
-    2. Validates all required parameters are present
-    3. Calls the main optimization API
-    4. Returns the optimized route
+    2. Auto-populates POIs if districts have few places
+    3. Validates all required parameters are present
+    4. Calls the main optimization API
+    5. Returns the optimized route
     """
+    # Minimum POIs required per district before triggering auto-fetch
+    MIN_POIS_PER_DISTRICT = 5
+    
     # Get optimization parameters from session
     params = chatbot.get_optimization_params(request.session_id)
     
@@ -109,6 +113,36 @@ async def generate_route_from_chat(
             status_code=400, 
             detail=f"Missing required parameters: {summary.get('missing_params', [])}"
         )
+    
+    # --- AUTO-POPULATE LOGIC ---
+    # Check if districts have enough POIs, if not, fetch from Google Places API
+    preferred_districts = params.get("preferred_districts", [])
+    if preferred_districts:
+        from app.services.poi_service import POIService
+        from app.services.maps_service import LimaPlacesExtractor
+        
+        poi_service = POIService(db)
+        districts_to_populate = []
+        
+        for district in preferred_districts:
+            pois_in_district = poi_service.get_pois_by_district(district)
+            poi_count = len(pois_in_district)
+            logger.info(f"District '{district}' has {poi_count} POIs")
+            
+            if poi_count < MIN_POIS_PER_DISTRICT:
+                districts_to_populate.append(district)
+        
+        # Fetch POIs for districts with insufficient places
+        if districts_to_populate:
+            logger.info(f"Auto-populating POIs for districts: {districts_to_populate}")
+            try:
+                extractor = LimaPlacesExtractor()
+                extractor.extract_and_populate_db(districts=districts_to_populate)
+                logger.info(f"Successfully populated POIs for: {districts_to_populate}")
+            except Exception as e:
+                logger.warning(f"Failed to auto-populate POIs: {e}")
+                # Continue anyway - we'll use whatever POIs are available
+    # -----------------------------
     
     # Apply any overrides
     if request.start_location:

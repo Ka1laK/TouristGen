@@ -80,7 +80,7 @@ class ChatbotService:
         new_params = result.get("extracted_params", {})
         self._merge_params(session.extracted_params, new_params)
         
-        # Infer districts from place_references if any
+        # Infer districts from place_references (NOT from start_location)
         if session.extracted_params.place_references:
             inferred_districts = await self._infer_districts_from_places(
                 session.extracted_params.place_references
