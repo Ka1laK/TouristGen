@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import POIDetailModal from './POIDetailModal'
 
 function Timeline({ timeline: initialTimeline, totalDuration, totalCost, fitnessScore, t, onTimelineUpdate }) {
@@ -6,6 +6,20 @@ function Timeline({ timeline: initialTimeline, totalDuration, totalCost, fitness
     const [selectedPOI, setSelectedPOI] = useState(null)
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [deleteConfirmIndex, setDeleteConfirmIndex] = useState(null)
+
+    // SYNC FIX: Update internal state when parent's timeline prop changes (OSRM sync)
+    useEffect(() => {
+        if (initialTimeline && initialTimeline.length > 0) {
+            // Check if travel times have changed
+            const timesChanged = initialTimeline.some((item, idx) =>
+                timeline[idx]?.travel_time !== item.travel_time
+            )
+            if (timesChanged || initialTimeline.length !== timeline.length) {
+                console.log('[TIMELINE SYNC] Updating internal state with new travel times')
+                setTimeline(initialTimeline)
+            }
+        }
+    }, [initialTimeline])
 
     if (!timeline || timeline.length === 0) {
         return null

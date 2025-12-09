@@ -18,11 +18,12 @@ class RoutesService:
     
     def __init__(self, api_key: Optional[str] = None):
         self.ors_url = "https://api.openrouteservice.org/v2"
+        self.osrm_url = "http://router.project-osrm.org"  # OSRM Public Demo Server
         self.api_key = api_key
         self.use_api = api_key is not None and api_key != ""
         
         if not self.use_api:
-            logger.warning("No OpenRouteService API key provided. Using fallback distance calculations.")
+            logger.warning("No OpenRouteService API key provided. Will attempt to use OSRM Public API as fallback.")
             
         # Simple in-memory cache for distance matrices
         # Key: tuple of sorted coordinates (to be order-independent for cache hit, though matrix is order-dependent)
@@ -49,20 +50,44 @@ class RoutesService:
         cache_key = (tuple(coordinates), profile)
         
         if cache_key in self._matrix_cache:
-            logger.info("Using cached distance matrix")
+            logger.info("[CACHE] Using CACHED distance matrix")
             return self._matrix_cache[cache_key]
 
+        logger.info(f"[CALC] Calculating distance matrix for {len(coordinates)} points, profile: {profile}")
+
+        # 1. Try OpenRouteService if configured
         if self.use_api:
+            logger.info("[ORS] API key present, attempting ORS...")
             try:
                 matrix = self._get_ors_matrix(coordinates, profile)
                 self._matrix_cache[cache_key] = matrix
+                logger.info(f"[ORS OK] Matrix shape {matrix.shape}")
+                if len(coordinates) > 1:
+                    logger.info(f"   Start->POI times (min): {matrix[0, 1:].tolist()[:5]}")
                 return matrix
             except Exception as e:
-                logger.error(f"ORS API error: {e}. Falling back to geodesic calculation.")
+                logger.error(f"[ORS FAIL] {e}")
+        else:
+            logger.info("[ORS] No API key, skipping ORS")
         
-        # Fallback to geodesic distance
+        # 2. Try OSRM Public API (Project-OSRM)
+        logger.info("[OSRM] Attempting OSRM Public API...")
+        try:
+            matrix = self._get_osrm_matrix(coordinates, profile)
+            self._matrix_cache[cache_key] = matrix
+            logger.info(f"[OSRM OK] Matrix shape {matrix.shape}")
+            if len(coordinates) > 1:
+                logger.info(f"   Start->POI times (min): {matrix[0, 1:].tolist()[:5]}")
+            return matrix
+        except Exception as e:
+            logger.warning(f"[OSRM FAIL] {e}")
+
+        # 3. Fallback to geodesic distance
+        logger.warning("[GEODESIC] Using straight-line distance (INACCURATE!)")
         matrix = self._calculate_geodesic_matrix(coordinates, profile)
         self._matrix_cache[cache_key] = matrix
+        if len(coordinates) > 1:
+            logger.info(f"   Geodesic Start->POI times (min): {matrix[0, 1:].tolist()[:5]}")
         return matrix
     
     def _get_ors_matrix(
@@ -95,7 +120,42 @@ class RoutesService:
         # Convert seconds to minutes
         durations = np.array(data["durations"])
         return durations / 60.0  # Convert to minutes
-    
+
+    def _get_osrm_matrix(
+        self,
+        coordinates: List[Tuple[float, float]],
+        profile: str
+    ) -> np.ndarray:
+        """Get matrix from OSRM Public API"""
+        # Map profiles to OSRM supported profiles
+        osrm_profile_map = {
+            "driving-car": "driving",
+            "cycling-regular": "driving", # OSRM demo often lacks cycling, use driving as approx
+            "foot-walking": "walking"
+        }
+        osrm_profile = osrm_profile_map.get(profile, "driving")
+        
+        # OSRM URL format: /table/v1/{profile}/{lon},{lat};{lon},{lat}?sources=...
+        coords_str = ";".join([f"{lon},{lat}" for lat, lon in coordinates])
+        url = f"{self.osrm_url}/table/v1/{osrm_profile}/{coords_str}"
+        
+        # params = {"sources": "0"} # We want full matrix, so no source filter needed for N*N
+        
+        response = requests.get(url, timeout=15)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        if data.get("code") != "Ok":
+             raise Exception(f"OSRM returned error code: {data.get('code')}")
+        
+        # Convert seconds to minutes
+        durations = np.array(data["durations"])
+        # Handle None/null values (unreachable) by replacing with large number or 0
+        durations = np.nan_to_num(durations, nan=99999.0)
+        
+        return durations / 60.0  # Convert to minutes
+
     def _calculate_geodesic_matrix(
         self,
         coordinates: List[Tuple[float, float]],
@@ -153,57 +213,103 @@ class RoutesService:
                 "steps": [...]  # Turn-by-turn directions
             }
         """
-        if not self.use_api:
-            # Fallback: simple straight line
-            dist_km = geodesic(start, end).kilometers
-            speed = 4.0 if profile == "foot-walking" else 30.0
-            duration_min = (dist_km / speed) * 60
-            
-            return {
-                "distance": dist_km,
-                "duration": duration_min,
-                "geometry": [start, end],
-                "steps": []
-            }
+        # 1. Try OpenRouteService if configured
+        if self.use_api:
+            try:
+                url = f"{self.ors_url}/directions/{profile}"
+                
+                headers = {
+                    "Authorization": self.api_key,
+                    "Content-Type": "application/json"
+                }
+                
+                # ORS expects [longitude, latitude]
+                body = {
+                    "coordinates": [
+                        [start[1], start[0]],
+                        [end[1], end[0]]
+                    ],
+                    "instructions": True
+                }
+                
+                response = requests.post(url, json=body, headers=headers, timeout=15)
+                response.raise_for_status()
+                
+                data = response.json()
+                
+                if "routes" in data and len(data["routes"]) > 0:
+                    route = data["routes"][0]
+                    summary = route["summary"]
+                    
+                    return {
+                        "distance": summary["distance"] / 1000,  # Convert to km
+                        "duration": summary["duration"] / 60,  # Convert to minutes
+                        "geometry": route.get("geometry", {}).get("coordinates", []),
+                        "steps": route.get("segments", [{}])[0].get("steps", [])
+                    }
+            except Exception as e:
+                logger.error(f"ORS route error: {e}. Falling back to OSRM.")
         
+        # 2. Try OSRM Public API
         try:
-            url = f"{self.ors_url}/directions/{profile}"
-            
-            headers = {
-                "Authorization": self.api_key,
-                "Content-Type": "application/json"
-            }
-            
-            # ORS expects [longitude, latitude]
-            body = {
-                "coordinates": [
-                    [start[1], start[0]],
-                    [end[1], end[0]]
-                ],
-                "instructions": True
-            }
-            
-            response = requests.post(url, json=body, headers=headers, timeout=15)
-            response.raise_for_status()
-            
-            data = response.json()
-            
-            if "routes" not in data or len(data["routes"]) == 0:
-                return None
-            
-            route = data["routes"][0]
-            summary = route["summary"]
-            
-            return {
-                "distance": summary["distance"] / 1000,  # Convert to km
-                "duration": summary["duration"] / 60,  # Convert to minutes
-                "geometry": route.get("geometry", {}).get("coordinates", []),
-                "steps": route.get("segments", [{}])[0].get("steps", [])
-            }
-            
+            result = self._get_osrm_route(start, end, profile)
+            if result:
+                return result
         except Exception as e:
-            logger.error(f"Error getting route: {e}")
+            logger.warning(f"OSRM route error: {e}. Falling back to geodesic.")
+        
+        # 3. Fallback: simple straight line
+        dist_km = geodesic(start, end).kilometers
+        speed = 4.0 if profile == "foot-walking" else 30.0
+        duration_min = (dist_km / speed) * 60
+        
+        return {
+            "distance": dist_km,
+            "duration": duration_min,
+            "geometry": [start, end],
+            "steps": []
+        }
+
+    def _get_osrm_route(
+        self,
+        start: Tuple[float, float],
+        end: Tuple[float, float],
+        profile: str
+    ) -> Optional[Dict]:
+        """Get route from OSRM Public API"""
+        osrm_profile_map = {
+            "driving-car": "driving",
+            "cycling-regular": "driving",
+            "foot-walking": "walking"
+        }
+        osrm_profile = osrm_profile_map.get(profile, "driving")
+        
+        # OSRM format: /route/v1/{profile}/{lon},{lat};{lon},{lat}
+        coords_str = f"{start[1]},{start[0]};{end[1]},{end[0]}"
+        url = f"{self.osrm_url}/route/v1/{osrm_profile}/{coords_str}"
+        
+        params = {
+            "overview": "full",
+            "geometries": "geojson",
+            "steps": "true"
+        }
+        
+        response = requests.get(url, params=params, timeout=15)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        if data.get("code") != "Ok" or not data.get("routes"):
             return None
+        
+        route = data["routes"][0]
+        
+        return {
+            "distance": route["distance"] / 1000,  # meters to km
+            "duration": route["duration"] / 60,  # seconds to minutes
+            "geometry": route.get("geometry", {}).get("coordinates", []),
+            "steps": route.get("legs", [{}])[0].get("steps", [])
+        }
     
     def get_isochrone(
         self,

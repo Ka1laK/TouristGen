@@ -19,11 +19,12 @@ let DefaultIcon = L.icon({
 
 L.Marker.prototype.options.icon = DefaultIcon
 
-function Map({ route, recommendations, step, startLocation, language, t }) {
+function Map({ route, recommendations, step, startLocation, language, t, onRouteTimes }) {
     const mapRef = useRef(null)
     const mapInstanceRef = useRef(null)
     const markersRef = useRef([])
     const polylinesRef = useRef([])
+    const routeTimesProcessedRef = useRef(null) // Track processed route to prevent infinite loop
 
     useEffect(() => {
         // Initialize map
@@ -178,6 +179,81 @@ function Map({ route, recommendations, step, startLocation, language, t }) {
                         `)
                     }
                 }).addTo(mapInstanceRef.current)
+
+                // SYNC FIX: Capture travel times from Leaflet Routing Machine (OSRM)
+                // and pass them to parent for timeline synchronization
+                routingControl.on('routesfound', function (e) {
+                    const routes = e.routes
+                    if (routes && routes.length > 0 && onRouteTimes) {
+                        const selectedRoute = routes[0]
+
+                        // Create a unique route ID based on waypoints to detect if we already processed this route
+                        const routeId = selectedRoute.waypoints.map(wp =>
+                            `${wp.latLng.lat.toFixed(4)},${wp.latLng.lng.toFixed(4)}`
+                        ).join('|')
+
+                        // Guard: Don't process if we already handled this exact route
+                        if (routeTimesProcessedRef.current === routeId) {
+                            console.log('[MAP SYNC] Route already processed, skipping')
+                            return
+                        }
+                        routeTimesProcessedRef.current = routeId
+
+                        // OSRM structure: route.instructions contains step-by-step with time per step
+                        // We need to calculate time per leg (waypoint to waypoint)
+                        const instructions = selectedRoute.instructions || []
+                        const waypointIndices = selectedRoute.waypointIndices || []
+
+                        // Calculate segment times between waypoints
+                        const segmentTimes = []
+                        let currentSegmentTime = 0
+                        let currentWaypointIdx = 0
+
+                        for (let i = 0; i < instructions.length; i++) {
+                            const instruction = instructions[i]
+                            currentSegmentTime += (instruction.time || 0)
+
+                            // Check if this instruction ends at a waypoint
+                            if (waypointIndices.includes(instruction.index) && i > 0) {
+                                segmentTimes.push(Math.round(currentSegmentTime / 60))
+                                currentSegmentTime = 0
+                                currentWaypointIdx++
+                            }
+                        }
+                        // Add the last segment
+                        if (currentSegmentTime > 0) {
+                            segmentTimes.push(Math.round(currentSegmentTime / 60))
+                        }
+
+                        // Fallback: if segmentTimes is empty, use total time divided by legs
+                        const totalTime = Math.round(selectedRoute.summary.totalTime / 60)
+                        const totalDistance = (selectedRoute.summary.totalDistance / 1000).toFixed(1)
+
+                        if (segmentTimes.length === 0 && route && route.route) {
+                            // Distribute total time proportionally
+                            const numSegments = route.route.length + (hasStart ? 1 : 0)
+                            const avgTime = Math.round(totalTime / numSegments)
+                            for (let i = 0; i < numSegments; i++) {
+                                segmentTimes.push(avgTime)
+                            }
+                        }
+
+                        console.log('[MAP SYNC] OSRM Route Times:', {
+                            segments: segmentTimes,
+                            total: totalTime,
+                            distance: totalDistance,
+                            routeId: routeId.substring(0, 50) + '...'
+                        })
+
+                        // Pass to parent for timeline sync
+                        onRouteTimes({
+                            segmentTimes: segmentTimes,
+                            totalTime: totalTime,
+                            totalDistance: totalDistance,
+                            hasStartLocation: hasStart
+                        })
+                    }
+                })
 
                 // Store control for cleanup
                 mapInstanceRef.current.routingControl = routingControl
