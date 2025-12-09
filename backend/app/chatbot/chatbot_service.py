@@ -261,7 +261,7 @@ class ChatbotService:
             "avoid_categories": params.avoid_categories,
             "preferred_districts": params.preferred_districts,
             "transport_mode": params.transport_mode or "driving-car",
-            "start_location": None  # Will need to geocode start_location_text if provided
+            "start_location": None  # Start location geocoding not implemented
         }
     
     def get_session_summary(self, session_id: str) -> Optional[Dict[str, Any]]:

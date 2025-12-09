@@ -194,6 +194,15 @@ Responde en formato JSON:"""
             # Call Gemini
             response = self.model.generate_content(full_prompt)
             
+            # Check if response was blocked by safety filters
+            if not response.candidates or not response.candidates[0].content.parts:
+                logger.warning("Gemini response blocked or empty - likely safety filter")
+                return {
+                    "assistant_message": "Ocurrió un problema con la petición. ¿Podrías reformular tu mensaje? Estoy listo para ayudarte a planificar tu paseo.",
+                    "extracted_params": {},
+                    "missing_params": ["max_duration", "max_budget", "start_time", "day_of_week", "preferred_districts"]
+                }
+            
             # Parse JSON response
             response_text = response.text.strip()
             
@@ -214,7 +223,6 @@ Responde en formato JSON:"""
             
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse Gemini response as JSON: {e}")
-            logger.error(f"Raw response: {response.text if 'response' in dir() else 'N/A'}")
             return {
                 "assistant_message": "Disculpa, tuve un problema procesando tu mensaje. ¿Podrías intentar de nuevo?",
                 "extracted_params": {},
@@ -223,7 +231,7 @@ Responde en formato JSON:"""
         except Exception as e:
             logger.error(f"Error calling Gemini API: {e}")
             return {
-                "assistant_message": f"Error al procesar el mensaje: {str(e)}",
+                "assistant_message": "Hubo un problema técnico. Por favor intenta de nuevo con tu solicitud.",
                 "extracted_params": {},
                 "missing_params": ["max_duration", "max_budget", "start_time", "day_of_week", "preferred_districts"]
             }
