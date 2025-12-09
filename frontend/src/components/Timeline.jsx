@@ -39,7 +39,7 @@ function Timeline({ timeline: initialTimeline, totalDuration, totalCost, fitness
     }
 
     const firstPOITravelTime = timeline[0]?.travel_time || 0
-    const displayTravelTime = firstPOITravelTime > 0 ? formatTime(firstPOITravelTime) : "Calculando..."
+    const displayTravelTime = firstPOITravelTime > 0 ? formatTime(firstPOITravelTime) : "—"  // No start location = no travel time
 
     const handleDeletePOI = (index) => {
         const newTimeline = timeline.filter((_, i) => i !== index)

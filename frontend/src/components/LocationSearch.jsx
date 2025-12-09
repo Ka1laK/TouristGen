@@ -34,7 +34,7 @@ function LocationSearch({ onLocationSelect, initialValue = '' }) {
         try {
             // Use backend proxy to avoid CORS issues
             const response = await fetch(
-                `http://localhost:8004/api/geocoding/search?q=${encodeURIComponent(query)}&limit=5`
+                `http://localhost:8000/api/geocoding/search?q=${encodeURIComponent(query)}&limit=5`
             )
 
             if (!response.ok) {
@@ -77,7 +77,7 @@ function LocationSearch({ onLocationSelect, initialValue = '' }) {
                     // Reverse geocode to get address using backend proxy
                     try {
                         const response = await fetch(
-                            `http://localhost:8004/api/geocoding/reverse?lat=${latitude}&lon=${longitude}`
+                            `http://localhost:8000/api/geocoding/reverse?lat=${latitude}&lon=${longitude}`
                         )
 
                         if (!response.ok) {
