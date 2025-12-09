@@ -16,7 +16,7 @@ class AntColonyOptimizer:
     - Heuristic information (distance, popularity, time windows)
     - Elitist pheromone update
     """
-    
+
     def __init__(
         self,
         pois: List[POINode],
@@ -65,7 +65,7 @@ class AntColonyOptimizer:
     # Maximum wait time allowed (in minutes) before a POI opens
     MAX_WAIT_TIME = 30
 
-    
+
     def _calculate_heuristic(self, current_idx: int, next_idx: int, current_time: int) -> float:
         """
         Calculate heuristic value (eta) for moving from current to next node.

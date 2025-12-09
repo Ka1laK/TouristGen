@@ -1,35 +1,24 @@
 """
-Geocoding API endpoints - Proxy for Nominatim to avoid CORS issues
+Geocoding API endpoints - Using Google Geocoding API
 """
 
 from fastapi import APIRouter, HTTPException, Query
-from typing import List, Dict, Optional
+from typing import List, Dict
 import requests
 import logging
-import time
+
+from app.config import settings
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# Rate limiting
-last_request_time = 0
-MIN_REQUEST_INTERVAL = 1.0  # seconds between requests (Nominatim policy)
-
-def rate_limit():
-    """Ensure we don't exceed Nominatim's rate limit (1 request per second)"""
-    global last_request_time
-    current_time = time.time()
-    time_since_last = current_time - last_request_time
-    
-    if time_since_last < MIN_REQUEST_INTERVAL:
-        time.sleep(MIN_REQUEST_INTERVAL - time_since_last)
-    
-    last_request_time = time.time()
+# Google Geocoding API endpoint
+GOOGLE_GEOCODING_URL = "https://maps.googleapis.com/maps/api/geocode/json"
 
 
 async def geocode_location(query: str, limit: int = 3) -> List[Dict]:
     """
-    Geocode a location string to coordinates.
+    Geocode a location string to coordinates using Google Geocoding API.
     
     This is a helper function that can be called from other modules.
     Unlike the endpoint, this doesn't raise HTTPException on errors.
@@ -42,21 +31,21 @@ async def geocode_location(query: str, limit: int = 3) -> List[Dict]:
         List of dicts with lat, lon, display_name keys
     """
     try:
-        rate_limit()
+        api_key = settings.google_maps_api_key
+        if not api_key:
+            logger.error("Google Maps API key not configured")
+            return []
         
         # Add Lima, Peru context to improve results
         search_query = f"{query}, Lima, Peru"
         
         response = requests.get(
-            "https://nominatim.openstreetmap.org/search",
+            GOOGLE_GEOCODING_URL,
             params={
-                "q": search_query,
-                "format": "json",
-                "limit": limit,
-                "addressdetails": 1
-            },
-            headers={
-                "User-Agent": "TouristGen/1.0 (Educational Project)"
+                "address": search_query,
+                "key": api_key,
+                "language": "es",
+                "region": "pe"  # Bias results to Peru
             },
             timeout=10
         )
@@ -64,20 +53,33 @@ async def geocode_location(query: str, limit: int = 3) -> List[Dict]:
         response.raise_for_status()
         data = response.json()
         
+        if data.get("status") != "OK":
+            logger.warning(f"Google Geocoding API status: {data.get('status')}")
+            return []
+        
         results = []
-        for item in data:
+        for item in data.get("results", [])[:limit]:
+            location = item.get("geometry", {}).get("location", {})
+            
+            # Extract address components
+            address_components = {}
+            for component in item.get("address_components", []):
+                for comp_type in component.get("types", []):
+                    address_components[comp_type] = component.get("long_name", "")
+            
             results.append({
-                "display_name": item.get("display_name", ""),
-                "lat": float(item.get("lat", 0)),
-                "lon": float(item.get("lon", 0)),
-                "address": item.get("address", {})
+                "display_name": item.get("formatted_address", ""),
+                "lat": float(location.get("lat", 0)),
+                "lon": float(location.get("lng", 0)),
+                "address": address_components,
+                "place_id": item.get("place_id", "")
             })
         
-        logger.info(f"Geocoded '{query}' -> {len(results)} results")
+        logger.info(f"Google Geocoded '{query}' -> {len(results)} results")
         return results
         
     except Exception as e:
-        logger.error(f"Geocoding error for '{query}': {e}")
+        logger.error(f"Google Geocoding error for '{query}': {e}")
         return []
 
 
@@ -87,27 +89,26 @@ def search_location(
     limit: int = Query(5, ge=1, le=10, description="Maximum number of results")
 ) -> List[Dict]:
     """
-    Search for locations using Nominatim geocoding
+    Search for locations using Google Geocoding API
     
-    This endpoint proxies requests to Nominatim to avoid CORS issues
-    and ensures proper User-Agent headers are sent.
+    Returns geocoded locations with coordinates and address details.
     """
     try:
-        rate_limit()
+        api_key = settings.google_maps_api_key
+        if not api_key:
+            logger.error("Google Maps API key not configured")
+            raise HTTPException(status_code=500, detail="Geocoding service not configured")
         
         # Add Lima, Peru context to improve results
         search_query = f"{q}, Lima, Peru"
         
         response = requests.get(
-            "https://nominatim.openstreetmap.org/search",
+            GOOGLE_GEOCODING_URL,
             params={
-                "q": search_query,
-                "format": "json",
-                "limit": limit,
-                "addressdetails": 1
-            },
-            headers={
-                "User-Agent": "TouristGen/1.0 (Educational Project)"
+                "address": search_query,
+                "key": api_key,
+                "language": "es",
+                "region": "pe"
             },
             timeout=10
         )
@@ -115,17 +116,33 @@ def search_location(
         response.raise_for_status()
         data = response.json()
         
+        status = data.get("status")
+        if status == "ZERO_RESULTS":
+            return []
+        elif status != "OK":
+            logger.error(f"Google Geocoding API error: {status} - {data.get('error_message', '')}")
+            raise HTTPException(status_code=502, detail=f"Geocoding service error: {status}")
+        
         # Transform to our format
         results = []
-        for item in data:
+        for item in data.get("results", [])[:limit]:
+            location = item.get("geometry", {}).get("location", {})
+            
+            # Extract address components
+            address_components = {}
+            for component in item.get("address_components", []):
+                for comp_type in component.get("types", []):
+                    address_components[comp_type] = component.get("long_name", "")
+            
             results.append({
-                "display_name": item.get("display_name", ""),
-                "lat": float(item.get("lat", 0)),
-                "lon": float(item.get("lon", 0)),
-                "address": item.get("address", {})
+                "display_name": item.get("formatted_address", ""),
+                "lat": float(location.get("lat", 0)),
+                "lon": float(location.get("lng", 0)),
+                "address": address_components,
+                "place_id": item.get("place_id", "")
             })
         
-        logger.info(f"Geocoding search for '{q}' returned {len(results)} results")
+        logger.info(f"Google Geocoding search for '{q}' returned {len(results)} results")
         return results
         
     except requests.exceptions.Timeout:
@@ -134,6 +151,8 @@ def search_location(
     except requests.exceptions.RequestException as e:
         logger.error(f"Error searching for location: {e}")
         raise HTTPException(status_code=502, detail="Geocoding service error")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Unexpected error in geocoding search: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -145,22 +164,21 @@ def reverse_geocode(
     lon: float = Query(..., description="Longitude")
 ) -> Dict:
     """
-    Reverse geocode coordinates to get address
-    
-    This endpoint proxies requests to Nominatim to avoid CORS issues.
+    Reverse geocode coordinates to get address using Google Geocoding API
     """
     try:
-        rate_limit()
+        api_key = settings.google_maps_api_key
+        if not api_key:
+            logger.error("Google Maps API key not configured")
+            raise HTTPException(status_code=500, detail="Geocoding service not configured")
         
         response = requests.get(
-            "https://nominatim.openstreetmap.org/reverse",
+            GOOGLE_GEOCODING_URL,
             params={
-                "lat": lat,
-                "lon": lon,
-                "format": "json"
-            },
-            headers={
-                "User-Agent": "TouristGen/1.0 (Educational Project)"
+                "latlng": f"{lat},{lon}",
+                "key": api_key,
+                "language": "es",
+                "result_type": "street_address|route|neighborhood|locality"
             },
             timeout=10
         )
@@ -168,14 +186,37 @@ def reverse_geocode(
         response.raise_for_status()
         data = response.json()
         
+        status = data.get("status")
+        if status == "ZERO_RESULTS":
+            return {
+                "display_name": f"{lat}, {lon}",
+                "lat": lat,
+                "lon": lon,
+                "address": {}
+            }
+        elif status != "OK":
+            logger.error(f"Google Reverse Geocoding error: {status}")
+            raise HTTPException(status_code=502, detail=f"Geocoding service error: {status}")
+        
+        # Get the first (most precise) result
+        first_result = data.get("results", [{}])[0]
+        location = first_result.get("geometry", {}).get("location", {})
+        
+        # Extract address components
+        address_components = {}
+        for component in first_result.get("address_components", []):
+            for comp_type in component.get("types", []):
+                address_components[comp_type] = component.get("long_name", "")
+        
         result = {
-            "display_name": data.get("display_name", ""),
-            "lat": float(data.get("lat", lat)),
-            "lon": float(data.get("lon", lon)),
-            "address": data.get("address", {})
+            "display_name": first_result.get("formatted_address", ""),
+            "lat": float(location.get("lat", lat)),
+            "lon": float(location.get("lng", lon)),
+            "address": address_components,
+            "place_id": first_result.get("place_id", "")
         }
         
-        logger.info(f"Reverse geocoding for ({lat}, {lon}) successful")
+        logger.info(f"Google Reverse geocoding for ({lat}, {lon}) successful")
         return result
         
     except requests.exceptions.Timeout:
@@ -184,6 +225,8 @@ def reverse_geocode(
     except requests.exceptions.RequestException as e:
         logger.error(f"Error reverse geocoding: {e}")
         raise HTTPException(status_code=502, detail="Geocoding service error")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Unexpected error in reverse geocoding: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
