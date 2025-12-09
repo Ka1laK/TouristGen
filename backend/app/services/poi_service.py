@@ -219,3 +219,25 @@ class POIService:
         ).count()
         
         return count
+
+    def search_by_name(self, name: str, limit: int = 5) -> List[POI]:
+        """
+        Search POIs by name using fuzzy matching (LIKE).
+        Used for district inference from place references.
+        
+        Args:
+            name: Place name to search for
+            limit: Maximum number of results
+            
+        Returns:
+            List of matching POIs ordered by relevance (rating)
+        """
+        # Use ILIKE-style matching (case insensitive)
+        search_pattern = f"%{name}%"
+        
+        return self.db.query(POI).filter(
+            POI.is_active == True,
+            POI.name.ilike(search_pattern)
+        ).order_by(
+            POI.rating.desc()
+        ).limit(limit).all()

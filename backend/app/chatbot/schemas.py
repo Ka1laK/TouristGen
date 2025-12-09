@@ -24,6 +24,8 @@ class ExtractedParameters(BaseModel):
     preferred_districts: List[str] = Field(default_factory=list)
     transport_mode: Optional[str] = Field(None, description="driving-car or foot-walking")
     start_location_text: Optional[str] = Field(None, description="Text description of start location")
+    day_of_week: Optional[str] = Field(None, description="Day of week: Monday, Tuesday, etc.")
+    place_references: List[str] = Field(default_factory=list, description="Place names mentioned by user for district inference")
     
 
 class ConversationState(BaseModel):
