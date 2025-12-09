@@ -101,6 +101,8 @@ function App() {
                 payload.selected_poi_ids = recommendations.map(poi => poi.id)
             }
 
+            console.log('Sending payload to generate-route:', JSON.stringify(payload, null, 2))
+
             // Use advanced optimization endpoint
             const response = await fetch(`${API_URL}/api/optimize/generate-route`, {
                 method: 'POST',
@@ -132,6 +134,69 @@ function App() {
         setRoute(null)
         setRecommendations(null)
         setCurrentPreferences(null)
+    }
+
+    // SYNC FIX: Update timeline with accurate travel times from Leaflet/OSRM
+    const handleRouteTimes = (routeTimesData) => {
+        if (!route || !routeTimesData) return
+
+        const { segmentTimes, totalTime, hasStartLocation } = routeTimesData
+
+        console.log('[SYNC] Updating timeline with OSRM times:', segmentTimes)
+
+        // Parse start time from route
+        const startTimeStr = route.start_time || '09:00'
+        const [startHour, startMin] = startTimeStr.split(':').map(Number)
+        let currentTimeMinutes = startHour * 60 + startMin
+
+        // Update timeline with accurate travel times and recalculate arrival/departure
+        const updatedTimeline = route.timeline.map((item, index) => {
+            // Determine OSRM travel time for this POI
+            const travelTimeIndex = hasStartLocation ? index : index - 1
+            let osrmTravelTime = travelTimeIndex >= 0 && travelTimeIndex < segmentTimes.length
+                ? segmentTimes[travelTimeIndex]
+                : (index === 0 && !hasStartLocation ? 0 : item.travel_time)
+
+            // SAFETY BUFFER: Add 10% extra time (minimum +1 minute) so itinerary shows 
+            // slightly more than map. This prevents user from being late.
+            // Example: Map=15min → Itinerary=17min (15 * 1.1 + 1 = 17.5 → 17)
+            if (osrmTravelTime > 0) {
+                osrmTravelTime = Math.ceil(osrmTravelTime * 1.1) + 1
+            }
+
+            // Add travel time to current time
+            currentTimeMinutes += osrmTravelTime
+
+            // Format arrival time
+            const arrivalHour = Math.floor(currentTimeMinutes / 60) % 24
+            const arrivalMin = currentTimeMinutes % 60
+            const arrival_time = `${arrivalHour.toString().padStart(2, '0')}:${arrivalMin.toString().padStart(2, '0')}`
+
+            // Add visit duration for departure time
+            currentTimeMinutes += (item.visit_duration || 0) + (item.wait_time || 0)
+            const departureHour = Math.floor(currentTimeMinutes / 60) % 24
+            const departureMin = currentTimeMinutes % 60
+            const departure_time = `${departureHour.toString().padStart(2, '0')}:${departureMin.toString().padStart(2, '0')}`
+
+            return {
+                ...item,
+                travel_time: osrmTravelTime,
+                arrival_time: arrival_time,
+                departure_time: departure_time
+            }
+        })
+
+        // Recalculate total duration with new travel times
+        const newTotalDuration = updatedTimeline.reduce((sum, item) => {
+            return sum + (item.visit_duration || 0) + (item.travel_time || 0) + (item.wait_time || 0)
+        }, 0)
+
+        setRoute(prev => ({
+            ...prev,
+            timeline: updatedTimeline,
+            total_duration: newTotalDuration,
+            osrm_total_time: totalTime
+        }))
     }
 
     // Helper to get icon based on category
@@ -179,6 +244,7 @@ function App() {
                             startLocation={currentPreferences?.start_location}
                             language={language}
                             t={t}
+                            onRouteTimes={handleRouteTimes}
                         />
                     </div>
 

@@ -91,6 +91,9 @@ class TOPTWSolver:
         """
         if not route or len(route) == 0:
             return 0.0
+        
+        # Debug logging for first few calls
+        debug_mode = len(route) <= 5  # Only debug small routes
             
         total_score = 0.0
         total_time = 0
@@ -145,11 +148,15 @@ class TOPTWSolver:
             if current_time >= poi.closing_time:
                 # Arrived too late - cannot visit
                 penalties += 200  # Heavy penalty for missing POI
+                if debug_mode:
+                    logger.warning(f"[FITNESS DEBUG] POI '{poi.name}' SKIPPED: Arrived too late. current_time={current_time}, closing_time={poi.closing_time}")
                 continue
             
             if current_time + poi.visit_duration > poi.closing_time:
                 # Not enough time to visit before closing
                 penalties += 150
+                if debug_mode:
+                    logger.warning(f"[FITNESS DEBUG] POI '{poi.name}' SKIPPED: Not enough time. current_time={current_time}, visit_duration={poi.visit_duration}, closing_time={poi.closing_time}")
                 continue
             
             # Visit the POI
@@ -172,6 +179,8 @@ class TOPTWSolver:
             # Si urgency_weight es 0, el POI ya no es visitable
             if urgency_weight == 0:
                 penalties += 300  # Penalización fuerte
+                if debug_mode:
+                    logger.warning(f"[FITNESS DEBUG] POI '{poi.name}' SKIPPED: urgency_weight=0 (POI closing soon). current_time={current_time}")
                 continue
             
             poi_score = (
@@ -184,6 +193,12 @@ class TOPTWSolver:
             )
             
             total_score += poi_score
+            
+            if debug_mode:
+                logger.info(f"[FITNESS DEBUG] POI '{poi.name}' ADDED to score. Score contribution: {poi_score:.2f}")
+        
+        if debug_mode:
+            logger.info(f"[FITNESS DEBUG] Loop complete. total_score={total_score:.2f}, total_time={total_time}, penalties={penalties:.2f}")
         
         # Check mandatory categories
         for category in self.constraints.mandatory_categories:
@@ -210,7 +225,15 @@ class TOPTWSolver:
         # Final fitness calculation
         fitness = total_score - (self.alpha * total_time) - (self.beta * total_cost) - penalties
         
-        return max(0.0, fitness)
+        # ROBUSTNESS FIX: Ensure minimum fitness for routes with visited POIs
+        # This prevents optimizer from returning 0 fitness for all routes
+        visited_pois_count = len([1 for idx in route if idx < len(self.pois)])
+        min_fitness = visited_pois_count * 0.1  # Small minimum per POI
+        
+        if debug_mode:
+            logger.info(f"[FITNESS DEBUG] Final: raw_fitness={fitness:.2f}, min_fitness={min_fitness:.2f}")
+        
+        return max(min_fitness, fitness)
     
     def _calculate_weather_weight(self, poi: POINode) -> float:
         """Calculate weight adjustment based on weather conditions"""
@@ -417,22 +440,37 @@ class TOPTWSolver:
             # Travel time
             travel_time = 0
             if i == 0 and start_location:
-                # Use ORS API travel time if available (set via set_start_to_poi_times)
-                if self.start_to_poi_times is not None and poi_idx < len(self.start_to_poi_times):
-                    travel_time = self.start_to_poi_times[poi_idx]
-                    logger.info(f"Using ORS travel time to first POI '{poi.name}': {travel_time:.1f} min")
-                else:
+                try:
+                    # Use ORS/OSRM API travel time if available
+                    # Fix: ensure index is within bounds (start_to_poi_times aligns with poi_nodes/pois)
+                    if self.start_to_poi_times is not None and poi_idx < len(self.start_to_poi_times):
+                        travel_time = self.start_to_poi_times[poi_idx]
+                        logger.info(f"[FIRST POI] Travel time: {travel_time:.2f} min (source: ORS/OSRM API)")
+                        logger.info(f"   POI: '{poi.name}' (idx={poi_idx})")
+                    else:
+                        raise ValueError(f"No API time available (start_to_poi_times={self.start_to_poi_times is not None}, idx={poi_idx})")
+                except Exception as e:
                     # Fallback: Calculate travel from start location to first POI using geodesic
-                    from geopy.distance import geodesic
-                    dist_km = geodesic(start_location, (poi.latitude, poi.longitude)).kilometers
-                    speeds = {
-                        "foot-walking": 4.5,
-                        "cycling-regular": 15.0,
-                        "driving-car": 25.0
-                    }
-                    speed = speeds.get(self.constraints.transport_mode, 25.0)
-                    travel_time = (dist_km / speed) * 60  # Convert to minutes
-                    logger.warning(f"Using fallback geodesic travel time to first POI: {travel_time:.1f} min")
+                    try:
+                        from geopy.distance import geodesic
+                        poi_loc = (poi.latitude, poi.longitude)
+                        dist_km = geodesic(start_location, poi_loc).kilometers
+                        
+                        speeds = {
+                            "foot-walking": 4.5,
+                            "cycling-regular": 15.0,
+                            "driving-car": 20.0  # Reduced from 25 for better city accuracy
+                        }
+                        speed = speeds.get(self.constraints.transport_mode, 20.0)
+                        travel_time = (dist_km / speed) * 60  # Convert to minutes
+                        
+                        logger.warning(
+                            f"[GEODESIC FALLBACK] First POI '{poi.name}': {travel_time:.2f} min "
+                            f"(dist: {dist_km:.2f}km @ {speed}km/h). Reason: {str(e)}"
+                        )
+                    except Exception as fallback_error:
+                        logger.error(f"Critical error calculating travel time: {fallback_error}")
+                        travel_time = 5.0  # Safe default
                 current_time += travel_time
             elif i > 0:
                 prev_idx = route[i-1]

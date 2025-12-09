@@ -287,23 +287,37 @@ async def generate_route(
             )
         
         # Calculate distance matrix - INCLUDE START LOCATION for accurate first POI travel time
+        if settings.openrouteservice_api_key:
+            logger.info(f"ORS API Key present: {settings.openrouteservice_api_key[:5]}... (first 5 chars)")
+        else:
+            logger.warning("ORS API Key MISSING in settings")
+
         logger.info(f"Calculating distance matrix for {len(poi_nodes)} POIs using {request.transport_mode}...")
         
         # Build coordinates list: start location (if provided) + all POIs
         if start_loc_tuple:
+            logger.info(f"Start location provided: {start_loc_tuple}")
             all_coordinates = [start_loc_tuple] + [(poi.latitude, poi.longitude) for poi in poi_nodes]
             time_matrix_with_start = routes_service.get_distance_matrix(all_coordinates, profile=request.transport_mode)
             
             # Extract time from start to each POI (row 0, columns 1 to N)
-            start_to_poi_times = time_matrix_with_start[0, 1:].tolist()
-            
-            # Extract POI-to-POI matrix (rows 1 to N, columns 1 to N)
-            time_matrix = time_matrix_with_start[1:, 1:]
-            
-            logger.info(f"Calculated distance matrix with start location: {time_matrix_with_start.shape}")
-            logger.info(f"Start to first 3 POIs times: {start_to_poi_times[:3]} minutes")
+            if time_matrix_with_start.shape[1] > 1:
+                start_to_poi_times = time_matrix_with_start[0, 1:].tolist()
+                
+                # Extract POI-to-POI matrix (rows 1 to N, columns 1 to N)
+                time_matrix = time_matrix_with_start[1:, 1:]
+                
+                logger.info(f"Calculated distance matrix with start location: {time_matrix_with_start.shape}")
+                logger.info(f"Start to first 3 POIs times (min): {start_to_poi_times[:3]}")
+                if len(start_to_poi_times) > 0:
+                     logger.info(f"Time to nearest POI: {min(start_to_poi_times):.2f} min. Time to farthest: {max(start_to_poi_times):.2f} min")
+            else:
+                logger.warning("Matrix shape mismatch after adding start location")
+                start_to_poi_times = None
+                time_matrix = None
         else:
             # No start location, just POI-to-POI matrix
+            logger.info("No start location provided")
             coordinates = [(poi.latitude, poi.longitude) for poi in poi_nodes]
             time_matrix = routes_service.get_distance_matrix(coordinates, profile=request.transport_mode)
             start_to_poi_times = None
@@ -349,7 +363,8 @@ async def generate_route(
             solver = ga.solver
         
         if not best_route:
-            raise HTTPException(status_code=500, detail="Failed to generate route")
+            logger.error(f"Both ACO and GA failed to generate a route. POI count: {len(poi_nodes)}, Duration limit: {constraints.max_duration} min")
+            raise HTTPException(status_code=500, detail=f"Could not generate route with {len(poi_nodes)} POIs. Try adding more locations or adjusting time.")
         
         logger.info(f"Optimization complete. Best fitness: {best_fitness:.2f}")
         
@@ -444,8 +459,10 @@ async def generate_route(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error generating route: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error generating route: {str(e)}")
+        import traceback
+        tb_str = traceback.format_exc()
+        logger.error(f"Error generating route: {e}\n{tb_str}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate route: {str(e)}")
 
 
 @router.post("/reoptimize")
