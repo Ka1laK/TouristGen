@@ -114,7 +114,19 @@ export const translations = {
         noInfoAvailable: "No info disponible",
         contactWhatsApp: "Contactar por WhatsApp",
         visitWebsite: "Visitar sitio web",
-        close: "Cerrar"
+        close: "Cerrar",
+
+        // Metrics Panel
+        optimizationMetrics: "Métricas de Optimización",
+        fitnessScore: "Fitness",
+        convergenceChart: "Convergencia del Algoritmo",
+        algorithmParams: "Parámetros ACO",
+        ants: "Hormigas",
+        iterations: "Iteraciones",
+        pheromone: "Feromona",
+        heuristic: "Heurística",
+        evaporation: "Evaporación",
+        poisEvaluated: "POIs evaluados"
     },
     en: {
         // Header
@@ -231,6 +243,18 @@ export const translations = {
         noInfoAvailable: "No info available",
         contactWhatsApp: "Contact via WhatsApp",
         visitWebsite: "Visit website",
-        close: "Close"
+        close: "Close",
+
+        // Metrics Panel
+        optimizationMetrics: "Optimization Metrics",
+        fitnessScore: "Fitness",
+        convergenceChart: "Algorithm Convergence",
+        algorithmParams: "ACO Parameters",
+        ants: "Ants",
+        iterations: "Iterations",
+        pheromone: "Pheromone",
+        heuristic: "Heuristic",
+        evaporation: "Evaporation",
+        poisEvaluated: "POIs evaluated"
     }
 }

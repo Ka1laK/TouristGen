@@ -310,8 +310,8 @@ def recommend_pois(
             if request.mandatory_categories:
                 pois = [p for p in pois if p.category in request.mandatory_categories]
                 
-            # Take top 10 closest
-            pois = pois[:10]
+            # Take top 20 closest
+            pois = pois[:20]
             
         # Logic 2: If no start location, filter by district
         elif request.preferred_districts:

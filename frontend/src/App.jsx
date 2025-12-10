@@ -5,12 +5,14 @@ import PreferenceForm from './components/PreferenceForm'
 import WeatherTimeWidget from './components/WeatherTimeWidget'
 import LanguageSwitcher from './components/LanguageSwitcher'
 import ChatBot from './components/ChatBot'
+import MetricsPanel from './components/MetricsPanel'
 import { translations } from './translations'
 import './index.css'
 import './widgets.css'
 import './buttons.css'
 import './language-switcher.css'
 import './chatbot.css'
+import './metrics-panel.css'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -343,6 +345,17 @@ function App() {
                                     setRoute(updatedRoute)
                                 }}
                             />
+
+                            {/* ACO Optimization Metrics */}
+                            <MetricsPanel
+                                metrics={route.aco_metrics}
+                                fitnessScore={route.fitness_score}
+                                numPois={route.num_pois}
+                                totalDuration={route.total_duration}
+                                totalCost={route.total_cost}
+                                t={t}
+                            />
+
                             <button className="btn-reset-styled" onClick={handleReset}>
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
