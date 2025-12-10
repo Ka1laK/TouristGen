@@ -1,13 +1,12 @@
 /* Metrics Panel Styles */
 
 .metrics-panel {
-    background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98));
+    background: #ffffff;
     border-radius: 16px;
     padding: 16px;
     margin-top: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
 .metrics-header {
@@ -16,7 +15,7 @@
     align-items: center;
     cursor: pointer;
     padding-bottom: 12px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
     margin-bottom: 12px;
 }
 
@@ -26,7 +25,7 @@
     gap: 8px;
     font-size: 14px;
     font-weight: 600;
-    color: #e2e8f0;
+    color: #1e293b;
 }
 
 .metrics-title svg {
@@ -35,7 +34,7 @@
 
 .expand-icon {
     transition: transform 0.3s ease;
-    color: #94a3b8;
+    color: #64748b;
 }
 
 .expand-icon.expanded {
@@ -51,19 +50,19 @@
 }
 
 .metric-card {
-    background: rgba(255, 255, 255, 0.05);
+    background: #f8fafc;
     border-radius: 12px;
     padding: 12px 8px;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 4px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.05);
     transition: all 0.3s ease;
 }
 
 .metric-card:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: #f1f5f9;
     transform: translateY(-2px);
 }
 
@@ -96,12 +95,12 @@
 .metric-value {
     font-size: 18px;
     font-weight: 700;
-    color: #f1f5f9;
+    color: #1e293b;
 }
 
 .metric-label {
     font-size: 10px;
-    color: #94a3b8;
+    color: #64748b;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -121,7 +120,7 @@
 
 /* Convergence Chart */
 .convergence-chart {
-    background: rgba(0, 0, 0, 0.2);
+    background: #f8fafc;
     border-radius: 12px;
     padding: 12px;
     margin-bottom: 12px;
@@ -129,7 +128,7 @@
 
 .chart-title {
     font-size: 12px;
-    color: #94a3b8;
+    color: #64748b;
     margin-bottom: 8px;
     text-align: center;
 }
@@ -153,14 +152,14 @@
 
 /* Algorithm Parameters */
 .algorithm-params {
-    background: rgba(0, 0, 0, 0.2);
+    background: #f8fafc;
     border-radius: 12px;
     padding: 12px;
 }
 
 .params-title {
     font-size: 12px;
-    color: #94a3b8;
+    color: #64748b;
     margin-bottom: 10px;
     text-align: center;
 }
@@ -177,8 +176,9 @@
     align-items: center;
     gap: 2px;
     padding: 8px;
-    background: rgba(255, 255, 255, 0.03);
+    background: #ffffff;
     border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .param-label {
@@ -189,7 +189,7 @@
 .param-value {
     font-size: 14px;
     font-weight: 600;
-    color: #e2e8f0;
+    color: #1e293b;
 }
 
 /* Responsive */
@@ -197,11 +197,11 @@
     .metrics-cards {
         grid-template-columns: repeat(2, 1fr);
     }
-    
+
     .params-grid {
         grid-template-columns: repeat(2, 1fr);
     }
-    
+
     .metric-value {
         font-size: 16px;
     }

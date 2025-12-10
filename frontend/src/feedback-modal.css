@@ -15,27 +15,33 @@
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
 .feedback-modal {
-    background: linear-gradient(135deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.99));
+    background: #ffffff;
     border-radius: 20px;
     padding: 32px;
     min-width: 320px;
     max-width: 400px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
     animation: slideUp 0.3s ease;
 }
 
 @keyframes slideUp {
-    from { 
+    from {
         opacity: 0;
         transform: translateY(20px);
     }
-    to { 
+
+    to {
         opacity: 1;
         transform: translateY(0);
     }
@@ -53,7 +59,7 @@
 }
 
 .feedback-header h3 {
-    color: #f1f5f9;
+    color: #1e293b;
     font-size: 18px;
     font-weight: 600;
     margin: 0;
@@ -71,7 +77,7 @@
     background: none;
     border: none;
     font-size: 40px;
-    color: #475569;
+    color: #cbd5e1;
     cursor: pointer;
     transition: all 0.2s ease;
     padding: 0;
@@ -89,7 +95,7 @@
 
 .rating-label {
     text-align: center;
-    color: #94a3b8;
+    color: #64748b;
     font-size: 14px;
     height: 20px;
     margin-bottom: 24px;
@@ -163,13 +169,21 @@
 }
 
 @keyframes popIn {
-    0% { transform: scale(0); }
-    70% { transform: scale(1.2); }
-    100% { transform: scale(1); }
+    0% {
+        transform: scale(0);
+    }
+
+    70% {
+        transform: scale(1.2);
+    }
+
+    100% {
+        transform: scale(1);
+    }
 }
 
 .feedback-success p {
-    color: #f1f5f9;
+    color: #1e293b;
     font-size: 16px;
     margin: 0;
 }
@@ -178,12 +192,12 @@
 /* Renders as a card section instead of overlay modal */
 
 .feedback-inline-card {
-    background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98));
+    background: #ffffff;
     border-radius: 16px;
     padding: 24px;
     margin-top: 20px;
     border: 1px solid rgba(251, 191, 36, 0.2);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
     text-align: center;
 }
 
@@ -202,7 +216,7 @@
 }
 
 .feedback-inline-header h4 {
-    color: #f1f5f9;
+    color: #1e293b;
     font-size: 16px;
     font-weight: 600;
     margin: 0;
@@ -259,7 +273,7 @@
 }
 
 .feedback-success-inline p {
-    color: #f1f5f9;
+    color: #1e293b;
     font-size: 14px;
     margin: 0;
 }

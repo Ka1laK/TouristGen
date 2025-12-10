@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react'
 
-function WeatherTimeWidget({ t, language }) {
+function WeatherTimeWidget({ t, language, startLocation }) {
     const [currentTime, setCurrentTime] = useState(new Date())
     const [weather, setWeather] = useState(null)
     const [loading, setLoading] = useState(true)
+
+    // Default coordinates (Lima center)
+    const DEFAULT_LAT = -12.0464
+    const DEFAULT_LNG = -77.0428
 
     useEffect(() => {
         // Update time every second
@@ -11,17 +15,20 @@ function WeatherTimeWidget({ t, language }) {
             setCurrentTime(new Date())
         }, 1000)
 
-        // Fetch weather for Lima
+        // Fetch weather for current location
         fetchWeather()
 
         return () => clearInterval(timer)
-    }, [])
+    }, [startLocation]) // Re-fetch when startLocation changes
 
     const fetchWeather = async () => {
+        // Use startLocation if provided, otherwise default to Lima center
+        const lat = startLocation?.latitude || DEFAULT_LAT
+        const lng = startLocation?.longitude || DEFAULT_LNG
+
         try {
-            // Lima coordinates
             const response = await fetch(
-                'https://api.open-meteo.com/v1/forecast?latitude=-12.0464&longitude=-77.0428&current=temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m&timezone=America/Lima'
+                `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m&timezone=America/Lima`
             )
             const data = await response.json()
             setWeather(data.current)
@@ -120,7 +127,7 @@ function WeatherTimeWidget({ t, language }) {
             <div className="widget-card weather-card">
                 <div className="card-icon">{weatherInfo?.icon || '🌡️'}</div>
                 <div className="card-content">
-                    <div className="card-title">{t.weatherInLima}</div>
+                    <div className="card-title">{startLocation ? (t.weatherAtLocation || 'Clima en tu ubicación') : t.weatherInLima}</div>
                     <div className="card-value">
                         {weather?.temperature_2m ? `${Math.round(weather.temperature_2m)}°C` : '--°C'}
                     </div>

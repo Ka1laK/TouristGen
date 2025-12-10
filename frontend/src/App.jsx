@@ -25,6 +25,7 @@ function App() {
     const [error, setError] = useState(null)
     const [step, setStep] = useState('search') // 'search', 'recommendations', 'routing'
     const [currentPreferences, setCurrentPreferences] = useState(null)
+    const [liveStartLocation, setLiveStartLocation] = useState(null) // For immediate weather updates
     const [language, setLanguage] = useState('es') // 'es' or 'en'
     const [showFeedback, setShowFeedback] = useState(false) // For feedback modal
 
@@ -226,7 +227,7 @@ function App() {
             </header>
 
             {/* Weather and Time Widget */}
-            <WeatherTimeWidget t={t} language={language} />
+            <WeatherTimeWidget t={t} language={language} startLocation={liveStartLocation || currentPreferences?.start_location} />
 
             <div className="main-content">
                 <aside className="sidebar">
@@ -238,6 +239,7 @@ function App() {
                         onGenerateRoute={handleGenerateRoute}
                         onReset={handleReset}
                         t={t}
+                        onStartLocationChange={setLiveStartLocation}
                     />
                 </aside>
 

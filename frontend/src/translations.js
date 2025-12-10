@@ -60,6 +60,7 @@ export const translations = {
         // Weather Widget
         currentTime: "Hora Actual",
         weatherInLima: "Clima en Lima",
+        weatherAtLocation: "Clima en tu ubicación",
         rainProb: "Probabilidad de Lluvia",
         wind: "Viento",
         highProb: "Alta probabilidad",
@@ -200,6 +201,7 @@ export const translations = {
         // Weather Widget
         currentTime: "Current Time",
         weatherInLima: "Weather in Lima",
+        weatherAtLocation: "Weather at your location",
         rainProb: "Rain Probability",
         wind: "Wind",
         highProb: "High probability",

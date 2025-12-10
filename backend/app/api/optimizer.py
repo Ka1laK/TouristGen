@@ -138,8 +138,8 @@ async def generate_route(
             lat = request.start_location["latitude"]
             lon = request.start_location["longitude"]
             
-            # Check DB count within ~2km (approx 0.018 degrees)
-            nearby_count = poi_service.count_pois_near(lat, lon, radius_km=2.0)
+            # Check DB count within ~2.5km (approx 0.018 degrees)
+            nearby_count = poi_service.count_pois_near(lat, lon, radius_km=2.5)
             logger.info(f"POIs found near start location ({lat}, {lon}): {nearby_count}")
             
             if nearby_count < 5:

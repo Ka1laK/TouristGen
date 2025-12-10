@@ -107,7 +107,7 @@ const DAYS_OF_WEEK = [
     { value: 'Sunday', key: 'sunday' }
 ]
 
-function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onReset, t }) {
+function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onReset, t, onStartLocationChange }) {
     const [preferences, setPreferences] = useState({
         max_duration: 480,
         max_budget: 200,
@@ -144,6 +144,10 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
             ...prev,
             start_location: location
         }))
+        // Notify parent immediately for weather update
+        if (onStartLocationChange && location.latitude && location.longitude) {
+            onStartLocationChange(location)
+        }
     }
 
     const addItem = (field, value) => {
@@ -345,80 +349,6 @@ function PreferenceForm({ onSubmit, loading, error, step, onGenerateRoute, onRes
                     ))}
                 </select>
             </div>
-
-            {/* Transport Mode */}
-            <div className="form-group-compact">
-                <label className="form-label-icon">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M5 17h14v-2a3 3 0 0 0-3-3H8a3 3 0 0 0-3 3v2z" />
-                        <path d="M8 12V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v6" />
-                        <circle cx="8.5" cy="17.5" r="1.5" />
-                        <circle cx="15.5" cy="17.5" r="1.5" />
-                    </svg>
-                    <span>{t.transportMode || "Modo de transporte"}</span>
-                </label>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button
-                        type="button"
-                        className={`btn-transport ${preferences.transport_mode === 'driving-car' ? 'active' : ''}`}
-                        onClick={() => handleChange('transport_mode', 'driving-car')}
-                        style={{
-                            flex: 1,
-                            padding: '0.75rem',
-                            border: preferences.transport_mode === 'driving-car' ? '2px solid #3b82f6' : '1px solid #cbd5e1',
-                            borderRadius: '8px',
-                            background: preferences.transport_mode === 'driving-car' ? '#eff6ff' : 'white',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.5rem',
-                            fontWeight: preferences.transport_mode === 'driving-car' ? '600' : '400'
-                        }}
-                    >
-                        🚗 {t.byCar || "En auto"}
-                    </button>
-                    <button
-                        type="button"
-                        className={`btn-transport ${preferences.transport_mode === 'foot-walking' ? 'active' : ''}`}
-                        onClick={() => handleChange('transport_mode', 'foot-walking')}
-                        style={{
-                            flex: 1,
-                            padding: '0.75rem',
-                            border: preferences.transport_mode === 'foot-walking' ? '2px solid #3b82f6' : '1px solid #cbd5e1',
-                            borderRadius: '8px',
-                            background: preferences.transport_mode === 'foot-walking' ? '#eff6ff' : 'white',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.5rem',
-                            fontWeight: preferences.transport_mode === 'foot-walking' ? '600' : '400'
-                        }}
-                    >
-                        🚶 {t.onFoot || "A pie"}
-                    </button>
-                </div>
-            </div>
-
-            {/* Pace - Only show when walking */}
-            {preferences.transport_mode === 'foot-walking' && (
-                <div className="form-group-compact">
-                    <label className="form-label-icon">
-                        <WalkIcon />
-                        <span>{t.pace}</span>
-                    </label>
-                    <select
-                        className="form-select"
-                        value={preferences.user_pace}
-                        onChange={(e) => handleChange('user_pace', e.target.value)}
-                    >
-                        <option value="slow">{t.slow}</option>
-                        <option value="medium">{t.medium}</option>
-                        <option value="fast">{t.fast}</option>
-                    </select>
-                </div>
-            )}
 
             {/* Advanced Options Toggle */}
             <button
