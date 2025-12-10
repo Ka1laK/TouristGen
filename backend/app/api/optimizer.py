@@ -92,6 +92,7 @@ class OptimizationResponse(BaseModel):
     num_pois: int
     weather_summary: Optional[Dict] = None
     route_geometry: Optional[List[Dict]] = None
+    aco_metrics: Optional[Dict] = None  # ACO convergence metrics for visualization
 
 
 class FeedbackRequest(BaseModel):
@@ -187,9 +188,9 @@ async def generate_route(
             if not pois:
                 raise HTTPException(status_code=404, detail="No POIs found matching criteria")
             
-            # OPTIMIZATION: Limit to top 15 most popular POIs to speed up calculation
-            # Sort by popularity and take top 15
-            pois = sorted(pois, key=lambda x: x.popularity, reverse=True)[:20]
+            # OPTIMIZATION: Limit to top 30 most popular POIs for better convergence visibility
+            # Sort by popularity and take top 30
+            pois = sorted(pois, key=lambda x: x.popularity, reverse=True)[:30]
         
         logger.info(f"Found {len(pois)} POIs before availability filter")
         
@@ -341,8 +342,21 @@ async def generate_route(
         logger.info("Starting Ant Colony Optimization (primary)...")
         best_route, best_fitness = aco.solve(verbose=True)
         
-        # Store solver reference for later use
+        # Store solver reference and metrics for later use
         solver = aco.solver
+        
+        # Capture ACO metrics for frontend visualization
+        aco_metrics_data = {
+            "algorithm": "Ant Colony Optimization",
+            "iterations": len(aco.fitness_history),
+            "num_ants": aco.num_ants,
+            "alpha": aco.alpha,
+            "beta": aco.beta,
+            "evaporation_rate": aco.evaporation_rate,
+            "fitness_history": aco.fitness_history,
+            "final_fitness": best_fitness,
+            "pois_evaluated": aco.num_nodes
+        }
         
         # Fallback to GA if ACO fails
         if not best_route:
@@ -448,7 +462,8 @@ async def generate_route(
             end_time=route_details["end_time"],
             num_pois=len(route_from_timeline),  # Use synced count
             weather_summary=weather_data,
-            route_geometry=route_geometry  # Now using synced coordinates
+            route_geometry=route_geometry,  # Now using synced coordinates
+            aco_metrics=aco_metrics_data  # ACO convergence data for frontend charts
         )
         
         return response
