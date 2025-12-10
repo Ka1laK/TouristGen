@@ -185,6 +185,8 @@ function App() {
             const departureMin = currentTimeMinutes % 60
             const departure_time = `${departureHour.toString().padStart(2, '0')}:${departureMin.toString().padStart(2, '0')}`
 
+            console.log(`[SYNC] POI ${index}: travel_time=${osrmTravelTime}min (from segmentTimes[${travelTimeIndex}]), arrival=${arrival_time}`)
+
             return {
                 ...item,
                 travel_time: osrmTravelTime,

@@ -205,22 +205,29 @@ function Map({ route, recommendations, step, startLocation, language, t, onRoute
                         const waypointIndices = selectedRoute.waypointIndices || []
 
                         // Calculate segment times between waypoints
+                        // waypointIndices example: [0, 127, 215, 329] means:
+                        // - Start at coordinate 0
+                        // - POI 1 at coordinate 127 (segment 1: 0→127)
+                        // - POI 2 at coordinate 215 (segment 2: 127→215)
+                        // - POI 3 at coordinate 329 (segment 3: 215→329)
                         const segmentTimes = []
                         let currentSegmentTime = 0
-                        let currentWaypointIdx = 0
+                        let nextWaypointIdx = 1 // Start looking for waypointIndices[1] (first POI)
 
                         for (let i = 0; i < instructions.length; i++) {
                             const instruction = instructions[i]
                             currentSegmentTime += (instruction.time || 0)
 
-                            // Check if this instruction ends at a waypoint
-                            if (waypointIndices.includes(instruction.index) && i > 0) {
+                            // Check if this instruction reaches the next waypoint
+                            if (nextWaypointIdx < waypointIndices.length &&
+                                instruction.index >= waypointIndices[nextWaypointIdx]) {
+                                // Save segment time and move to next waypoint
                                 segmentTimes.push(Math.round(currentSegmentTime / 60))
                                 currentSegmentTime = 0
-                                currentWaypointIdx++
+                                nextWaypointIdx++
                             }
                         }
-                        // Add the last segment
+                        // Add any remaining time as the last segment (shouldn't happen normally)
                         if (currentSegmentTime > 0) {
                             segmentTimes.push(Math.round(currentSegmentTime / 60))
                         }
@@ -238,12 +245,15 @@ function Map({ route, recommendations, step, startLocation, language, t, onRoute
                             }
                         }
 
-                        console.log('[MAP SYNC] OSRM Route Times:', {
+                        console.log('[MAP SYNC] OSRM Route Times:', JSON.stringify({
                             segments: segmentTimes,
+                            segmentCount: segmentTimes.length,
+                            expectedSegments: route.route.length + (hasStart ? 1 : 0),
                             total: totalTime,
+                            sumOfSegments: segmentTimes.reduce((a, b) => a + b, 0),
                             distance: totalDistance,
-                            routeId: routeId.substring(0, 50) + '...'
-                        })
+                            waypointIndices: waypointIndices
+                        }))
 
                         // Pass to parent for timeline sync
                         onRouteTimes({
