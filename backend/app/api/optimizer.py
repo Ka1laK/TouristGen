@@ -93,6 +93,9 @@ class OptimizationResponse(BaseModel):
     weather_summary: Optional[Dict] = None
     route_geometry: Optional[List[Dict]] = None
     aco_metrics: Optional[Dict] = None  # ACO convergence metrics for visualization
+    avg_poi_rating: Optional[float] = None  # For feedback learning
+    avg_poi_popularity: Optional[float] = None  # For feedback learning
+    total_distance_km: Optional[float] = None  # For feedback learning
 
 
 class FeedbackRequest(BaseModel):
@@ -451,6 +454,28 @@ async def generate_route(
                 logger.error(f"Error calculating route geometry: {e}")
                 route_geometry = []
 
+        # Calculate avg POI metrics for feedback learning
+        ratings = [poi.get("rating") for poi in route_from_timeline if poi.get("rating")]
+        popularities = [poi.get("popularity") for poi in route_from_timeline if poi.get("popularity")]
+        avg_rating = sum(ratings) / len(ratings) if ratings else None
+        avg_popularity = sum(popularities) / len(popularities) if popularities else None
+
+        # Calculate total distance in km using geodesic distance between POIs
+        total_distance_km = 0.0
+        from geopy.distance import geodesic
+        
+        # Include distance from start_location to first POI
+        if start_loc_coords and len(route_from_timeline) > 0:
+            first_poi_coords = (route_from_timeline[0]["latitude"], route_from_timeline[0]["longitude"])
+            total_distance_km += geodesic(start_loc_coords, first_poi_coords).km
+        
+        # Add distances between consecutive POIs
+        if len(route_from_timeline) > 1:
+            for i in range(len(route_from_timeline) - 1):
+                coord1 = (route_from_timeline[i]["latitude"], route_from_timeline[i]["longitude"])
+                coord2 = (route_from_timeline[i + 1]["latitude"], route_from_timeline[i + 1]["longitude"])
+                total_distance_km += geodesic(coord1, coord2).km
+
         response = OptimizationResponse(
             route_id=route_id,
             route=route_from_timeline,  # Now synced with timeline
@@ -463,7 +488,10 @@ async def generate_route(
             num_pois=len(route_from_timeline),  # Use synced count
             weather_summary=weather_data,
             route_geometry=route_geometry,  # Now using synced coordinates
-            aco_metrics=aco_metrics_data  # ACO convergence data for frontend charts
+            aco_metrics=aco_metrics_data,  # ACO convergence data for frontend charts
+            avg_poi_rating=avg_rating,
+            avg_poi_popularity=avg_popularity,
+            total_distance_km=round(total_distance_km, 2)
         )
         
         return response
