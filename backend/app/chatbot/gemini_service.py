@@ -193,7 +193,7 @@ class GeminiService:
             context_messages = []
             
             if conversation_history:
-                for msg in conversation_history[-6:]:  # Last 6 messages for context
+                for msg in conversation_history[-10:]:  # Last 10 messages for context
                     context_messages.append(f"{msg['role'].upper()}: {msg['content']}")
             
             context_messages.append(f"USER: {user_message}")
