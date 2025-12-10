@@ -126,7 +126,18 @@ export const translations = {
         pheromone: "Feromona",
         heuristic: "Heurística",
         evaporation: "Evaporación",
-        poisEvaluated: "POIs evaluados"
+        poisEvaluated: "POIs evaluados",
+
+        // Feedback Modal
+        rateFeedback: "¿Qué te pareció esta ruta?",
+        ratingBad: "Mala",
+        ratingPoor: "Regular",
+        ratingOk: "Aceptable",
+        ratingGood: "Buena",
+        ratingExcellent: "¡Excelente!",
+        submitFeedback: "Enviar",
+        skipFeedback: "Omitir",
+        thanksFeedback: "¡Gracias por tu calificación!"
     },
     en: {
         // Header
@@ -255,6 +266,17 @@ export const translations = {
         pheromone: "Pheromone",
         heuristic: "Heuristic",
         evaporation: "Evaporation",
-        poisEvaluated: "POIs evaluated"
+        poisEvaluated: "POIs evaluated",
+
+        // Feedback Modal
+        rateFeedback: "How was this route?",
+        ratingBad: "Bad",
+        ratingPoor: "Poor",
+        ratingOk: "Okay",
+        ratingGood: "Good",
+        ratingExcellent: "Excellent!",
+        submitFeedback: "Submit",
+        skipFeedback: "Skip",
+        thanksFeedback: "Thanks for your feedback!"
     }
 }

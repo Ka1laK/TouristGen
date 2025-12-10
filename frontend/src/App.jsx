@@ -6,6 +6,7 @@ import WeatherTimeWidget from './components/WeatherTimeWidget'
 import LanguageSwitcher from './components/LanguageSwitcher'
 import ChatBot from './components/ChatBot'
 import MetricsPanel from './components/MetricsPanel'
+import FeedbackModal from './components/FeedbackModal'
 import { translations } from './translations'
 import './index.css'
 import './widgets.css'
@@ -13,6 +14,7 @@ import './buttons.css'
 import './language-switcher.css'
 import './chatbot.css'
 import './metrics-panel.css'
+import './feedback-modal.css'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -24,6 +26,7 @@ function App() {
     const [step, setStep] = useState('search') // 'search', 'recommendations', 'routing'
     const [currentPreferences, setCurrentPreferences] = useState(null)
     const [language, setLanguage] = useState('es') // 'es' or 'en'
+    const [showFeedback, setShowFeedback] = useState(false) // For feedback modal
 
     const t = translations[language]
 
@@ -122,6 +125,7 @@ function App() {
             const data = await response.json()
             setRoute(data)
             setStep('routing')
+            setShowFeedback(true) // Enable inline feedback section
             console.log('Route generated:', data)
         } catch (err) {
             console.error('Error generating route:', err)
@@ -356,6 +360,26 @@ function App() {
                                 t={t}
                             />
 
+                            {/* Inline Feedback Section - at bottom so user analyzes route first */}
+                            {showFeedback && (
+                                <FeedbackModal
+                                    routeId={route.route_id}
+                                    routeData={{
+                                        total_duration: route.total_duration,
+                                        total_cost: route.total_cost,
+                                        num_pois: route.num_pois,
+                                        fitness_score: route.fitness_score,
+                                        avg_poi_rating: route.avg_poi_rating,
+                                        avg_poi_popularity: route.avg_poi_popularity,
+                                        total_distance_km: route.total_distance_km
+                                    }}
+                                    onClose={() => setShowFeedback(false)}
+                                    onSubmit={(rating) => console.log('Feedback submitted:', rating)}
+                                    t={t}
+                                    inline={true}
+                                />
+                            )}
+
                             <button className="btn-reset-styled" onClick={handleReset}>
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
@@ -375,8 +399,11 @@ function App() {
                 onRouteGenerated={(routeData) => {
                     setRoute(routeData)
                     setStep('routing')
+                    setShowFeedback(true) // Enable inline feedback
                 }}
             />
+
+            {/* Feedback is now inline in timeline-section */}
         </div>
     )
 }
